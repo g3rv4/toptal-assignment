@@ -18,11 +18,46 @@ module.exports = function (grunt) {
                     out: "static/js/public.min.js"
                 }
             }
+        },
+        copy: {
+            development: {
+                files: [
+                    // includes files within path
+                    {expand: false, src: ['./static/js/public.js'], dest: './static/js/public.min.js'}
+                ]
+            }
+        },
+        less: {
+            development: {
+                options: {
+                    paths: ["static/less"]
+                },
+                files: {
+                    "static/css/public.min.css": "static/less/public.less"
+                }
+            },
+            prod: {
+                options: {
+                    paths: ["static/less"],
+                    plugins: [
+                        new (require('less-plugin-clean-css'))({
+                            advanced: true,
+                            compatibility: 'ie8'
+                        })
+                    ]
+                },
+                files: {
+                    "static/css/public.min.css": "static/less/public.less"
+                }
+            }
         }
     });
 
     grunt.loadNpmTasks('grunt-contrib-requirejs');
+    grunt.loadNpmTasks('grunt-contrib-copy');
+    grunt.loadNpmTasks('grunt-contrib-less');
 
     // Default task(s).
-    grunt.registerTask('default', ['requirejs:compilePublic']);
+    grunt.registerTask('default', ['copy:development', 'less:development']);
+    grunt.registerTask('prod', ['requirejs:compilePublic', 'less:prod']);
 };

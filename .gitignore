@@ -1,5 +1,8 @@
 static/components/
 node_modules/
+static/js/*.min.js
+static/js/*.min.js.map
+static/css/*.min.css
 *.db
 .DS_Store
 *.log
