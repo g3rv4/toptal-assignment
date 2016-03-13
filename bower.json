@@ -1,0 +1,26 @@
+{
+  "name": "demo",
+  "version": "0.0.0",
+  "authors": [
+    "Gervasio Marchand <gmc@gmc.uy>"
+  ],
+  "description": "",
+  "main": "",
+  "moduleType": [],
+  "license": "MIT",
+  "homepage": "",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "startbootstrap-sb-admin-2": "~1.0.8",
+    "angular-bootstrap": "~1.2.4",
+    "lodash": "~4.6.1",
+    "angular-ui-router": "~0.2.18",
+    "requirejs": "~2.1.22"
+  }
+}
