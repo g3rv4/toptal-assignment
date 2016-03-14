@@ -10,7 +10,13 @@
                     })
                     .state('public.login', {
                         url: '/login',
+                        controller: 'LoginCtrl as ctrl',
                         templateUrl: '/static/templates/public/login.html'
+                    })
+                    .state('public.register', {
+                        url: '/register',
+                        controller: 'RegisterCtrl as ctrl',
+                        templateUrl: '/static/templates/public/register.html'
                     });
 
                 $urlRouterProvider.when('', '/login');

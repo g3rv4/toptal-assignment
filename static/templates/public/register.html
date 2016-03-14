@@ -1,0 +1,30 @@
+<div class="login-panel panel panel-default">
+    <div class="panel-heading">
+        <h3 class="panel-title">Create an Account</h3>
+    </div>
+    <div class="panel-body">
+        <form role="form" name="ctrl.formElement" novalidate ng-submit="ctrl.submit()">
+            <fieldset>
+                <div class="form-group" ng-class="ctrl.form.sent && !ctrl.formElement.email.$valid ? 'has-error' : ''">
+                    <label class="control-label" for="email">Please enter a valid email</label>
+                    <input class="form-control" placeholder="E-mail" name="email" type="email" id="email" autofocus required
+                           ng-model="ctrl.form.email">
+                </div>
+                <div class="form-group" ng-class="ctrl.form.sent && !ctrl.formElement.password.$valid ? 'has-error' : ''">
+                    <label class="control-label" for="password">Passwords should have at least 8 characters</label>
+                    <input class="form-control" placeholder="Password" name="password" type="password" id="password"
+                           value="" required ng-minlength="8" ng-model="ctrl.form.password">
+                </div>
+                <div class="form-group" ng-class="ctrl.form.sent && ctrl.form.password != ctrl.form.password2 ? 'has-error' : ''">
+                    <label class="control-label" for="password2">Passwords don't match</label>
+                    <input class="form-control" placeholder="Repeat Password" name="password2" id="password2" type="password" value=""
+                           required ng-model="ctrl.form.password2">
+                </div>
+                <div class="form-group small">
+                    Already have an account? <a ui-sref="public.login">Login here</a>
+                </div>
+                <input type="submit" class="btn btn-lg btn-success btn-block" value="Register"/>
+            </fieldset>
+        </form>
+    </div>
+</div>

@@ -1,3 +1,11 @@
-/**
- * Created by gervasio on 3/13/16.
- */
+(function (define) {
+    define(
+        ['angular'],
+        function () {
+            var LoginController = function () {
+            };
+
+            return [LoginController];
+        }
+    );
+}(define));
