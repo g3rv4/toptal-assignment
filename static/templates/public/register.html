@@ -1,24 +1,35 @@
-<div class="login-panel panel panel-default">
+<div class="login-panel panel" ng-class="ctrl.success === true ? 'panel-success' : 'panel-default'">
     <div class="panel-heading">
-        <h3 class="panel-title">Create an Account</h3>
+        <h3 class="panel-title" ng-if="ctrl.success === true">Account Created</h3>
+        <h3 class="panel-title" ng-if="ctrl.success !== true">Create an Account</h3>
     </div>
-    <div class="panel-body">
+    <div class="panel-body" ng-show="ctrl.success !== true">
         <form role="form" name="ctrl.formElement" novalidate ng-submit="ctrl.submit()">
+            <div class="alert alert-danger" ng-show="ctrl.success === false">
+                {{ctrl.error_message}}
+            </div>
             <fieldset>
+                <div class="form-group" ng-class="ctrl.form.sent && !ctrl.formElement.name.$valid ? 'has-error' : ''">
+                    <label class="control-label" for="name">Please enter your name</label>
+                    <input class="form-control" placeholder="Name" name="name" type="text" id="name" autofocus required
+                           ng-model="ctrl.form.name" ng-minlength="3">
+                </div>
                 <div class="form-group" ng-class="ctrl.form.sent && !ctrl.formElement.email.$valid ? 'has-error' : ''">
                     <label class="control-label" for="email">Please enter a valid email</label>
-                    <input class="form-control" placeholder="E-mail" name="email" type="email" id="email" autofocus required
+                    <input class="form-control" placeholder="E-mail" name="email" type="email" id="email" required
                            ng-model="ctrl.form.email">
                 </div>
-                <div class="form-group" ng-class="ctrl.form.sent && !ctrl.formElement.password.$valid ? 'has-error' : ''">
+                <div class="form-group"
+                     ng-class="ctrl.form.sent && !ctrl.formElement.password.$valid ? 'has-error' : ''">
                     <label class="control-label" for="password">Passwords should have at least 8 characters</label>
                     <input class="form-control" placeholder="Password" name="password" type="password" id="password"
                            value="" required ng-minlength="8" ng-model="ctrl.form.password">
                 </div>
-                <div class="form-group" ng-class="ctrl.form.sent && ctrl.form.password != ctrl.form.password2 ? 'has-error' : ''">
+                <div class="form-group"
+                     ng-class="ctrl.form.sent && ctrl.form.password != ctrl.form.password2 ? 'has-error' : ''">
                     <label class="control-label" for="password2">Passwords don't match</label>
-                    <input class="form-control" placeholder="Repeat Password" name="password2" id="password2" type="password" value=""
-                           required ng-model="ctrl.form.password2">
+                    <input class="form-control" placeholder="Repeat Password" name="password2" id="password2"
+                           type="password" value="" required ng-model="ctrl.form.password2">
                 </div>
                 <div class="form-group small">
                     Already have an account? <a ui-sref="public.login">Login here</a>
@@ -26,5 +37,9 @@
                 <input type="submit" class="btn btn-lg btn-success btn-block" value="Register"/>
             </fieldset>
         </form>
+    </div>
+    <div class="panel-body" ng-show="ctrl.success === true">
+        An email was sent to <strong>{{ctrl.form.email}}</strong> with instructions to activate your
+        account.
     </div>
 </div>

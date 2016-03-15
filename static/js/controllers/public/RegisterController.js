@@ -1,6 +1,6 @@
 (function (define) {
     define(
-        ['angular'],
+        [],
         function () {
             var RegisterController = function (ModelService) {
                 var _this = this;
@@ -10,12 +10,22 @@
                     _this.form.sent = true;
 
                     if(_this.formElement.$valid && _this.form.password == _this.form.password2) {
-                        var Registration = ModelService['Registration'];
-                        var reg = new Registration({
+                        var Account = ModelService['Account'];
+                        var reg = new Account({
+                            name: _this.form.name,
                             email: _this.form.email,
                             password: _this.form.password
                         });
-                        reg.$save();
+                        reg.$save(function(){
+                            _this.success = true;
+                        }, function(response){
+                            if(response.data.message){
+                                _this.error_message = response.data.message;
+                            } else {
+                                _this.error_message = 'Unexpected error ' + response.status;
+                            }
+                            _this.success = false;
+                        });
                     }
                 }
             };

@@ -23,7 +23,7 @@
             };
 
             return {
-                Registration: ModelFactory('Registration', '/api/registrations/:id')
+                Account: ModelFactory('Account', '/api/accounts/:id')
             };
         };
 

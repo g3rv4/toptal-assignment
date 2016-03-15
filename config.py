@@ -1,4 +1,5 @@
 settings = {
+    'link-expiration-seconds': 5 * 60,  # used on the email links
     'database': {
         'name': 'toptaldemo',
         'params': {
@@ -12,7 +13,8 @@ settings = {
     },
     'sendgrid': {
         'api-key': '',
-        'template-name': 'ToptalDemo'
+        'template-name': 'ToptalDemo',
+        'mail-from': 'Gervasio Marchand\'s Toptal Demo <gmc@gmc.uy>'
     },
     'secret_key': ''
 }

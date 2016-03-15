@@ -1,6 +1,6 @@
 (function (define) {
     define(
-        ['angular'],
+        [],
         function () {
             var LoginController = function () {
             };

@@ -1,4 +1,4 @@
-from itsdangerous import URLSafeSerializer
+from itsdangerous import URLSafeTimedSerializer
 from config import settings
 from server import app
 import sendgrid
@@ -8,14 +8,13 @@ import logger
 
 
 log = logger.getLogger(__name__)
-urlserializer = URLSafeSerializer(app.config['SECRET_KEY'])
+urlserializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 
 
-def send_email(to, subject, body, cc=None, bcc=None):
+def send_email(account, subject, body, cc=None, bcc=None):
     cc = cc or []
     bcc = bcc or []
-    if not isinstance(to, list):
-        to = [to]
+    to = [account.email]
     if not isinstance(cc, list):
         cc = [cc]
     if not isinstance(bcc, list):
@@ -40,11 +39,12 @@ def send_email(to, subject, body, cc=None, bcc=None):
         message.add_bcc(address)
 
     message.set_subject(subject)
-    message.set_from(settings.MAIL_FROM)
-    message.set_text(body)
+    message.set_from(settings['sendgrid']['mail-from'])
+    message.set_html(body)
 
     message.add_filter('templates', 'enable', '1')
     message.add_filter('templates', 'template_id', template)
+    message.add_substitution('--name--', account.name)
 
     status, msg = sg.send(message)
-    log.debug('Sendgrid message sent, status %i, message: %s' % (status, msg))
+    log.debug('Sendgrid message sent to %s, status %i, message: %s' % (to, status, msg))

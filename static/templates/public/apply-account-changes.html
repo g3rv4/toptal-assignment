@@ -1,0 +1,15 @@
+<div class="login-panel panel" ng-class="ctrl.success === true ? 'panel-success' : ctrl.success === false ? 'panel-danger' : 'panel-default'">
+    <div class="panel-heading">
+        <h3 class="panel-title">Account update</h3>
+    </div>
+    <div class="panel-body" ng-show="ctrl.success !== true && ctrl.success !== false">
+        Your changes are being applied, please wait
+    </div>
+    <div class="panel-body" ng-show="ctrl.success === false">
+        <p>{{ctrl.error_message}}</p>
+    </div>
+    <div class="panel-body" ng-show="ctrl.success === true">
+        <p>Account successfully updated</p>
+        <p class="small"><a ui-sref="public.login">Click here</a> to log in</p>
+    </div>
+</div>

@@ -17,6 +17,11 @@
                         url: '/register',
                         controller: 'RegisterCtrl as ctrl',
                         templateUrl: '/static/templates/public/register.html'
+                    })
+                    .state('public.apply_account_changes', {
+                        url: '/apply-account-changes?account_id&token',
+                        controller: 'ApplyAccountChangesCtrl as ctrl',
+                        templateUrl: '/static/templates/public/apply-account-changes.html'
                     });
 
                 $urlRouterProvider.when('', '/login');
