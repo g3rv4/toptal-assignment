@@ -16,6 +16,51 @@ app = Flask(__name__)
 api = Api(app)
 
 
+# decorator to allow certain methods to require logged in users. It can also enforce certain roles. If the function
+# receives an account or a roles parameter, those get populated by the decorator as well
+def require_auth(roles=None, accountid_free_roles=[]):
+    def decorator(funct):
+        def decorated_function(*args, **kwargs):
+            # check if the user is at least sending a bearer token
+            if 'Authorization' not in request.headers or len(request.headers['Authorization']) < 8 or request.headers['Authorization'][:7] != 'Bearer ':
+                abort(401, 'Unauthorized')
+
+            token = request.headers['Authorization'][7:]
+            try:
+                token = utils.urlserializer.loads(token, settings['oauth-token-expiration-seconds'], salt='access-token')
+            except BadData, e:
+                log.error(e)
+                abort(401, 'Unauthorized')
+
+            if roles and not any(r for r in roles if r in token['roles']):
+                abort(401, 'Unauthorized')
+
+            if 'account_id' in kwargs:
+                # if the value is 0, the user meant the owner of the token
+                kwargs['account_id'] = kwargs['account_id'] or token['id']
+
+                # if the function is receiving an account_id that's not the token's owner, then we require the user
+                # to have one of the accountid_free_roles
+                if kwargs['account_id'] != token['id'] and not any(r for r in accountid_free_roles if r in token['roles']):
+                    abort(401, 'Unauthorized')
+
+            try:
+                account = models.Account.get(id=kwargs['account_id'] if 'account_id' in kwargs else token['id'])
+            except models.Account.DoesNotExist:
+                abort(404, 'Not Found')
+
+            if 'kwargs' in funct.__code__.co_varnames or 'account' in funct.__code__.co_varnames:
+                kwargs['account'] = account
+
+            if 'kwargs' in funct.__code__.co_varnames or 'roles' in funct.__code__.co_varnames:
+                kwargs['roles'] = token['roles']
+
+            return funct(*args, **kwargs)
+
+        return decorated_function
+    return decorator
+
+
 class InvalidAPIUsage(Exception):
     status_code = 400
 
@@ -115,6 +160,12 @@ class Account(DemoResource):
         return '', 204
 
 
+class Meals(DemoResource):
+    @require_auth(roles=['user', 'admin'], accountid_free_roles=['admin'])
+    def post(self, account_id, account):
+        return '', 201
+
+
 @app.errorhandler(InvalidAPIUsage)
 def handle_invalid_usage(error):
     response = jsonify(error.to_dict())
@@ -123,6 +174,7 @@ def handle_invalid_usage(error):
 
 api.add_resource(Accounts, '/api/accounts', endpoint='accounts')
 api.add_resource(Account, '/api/accounts/<int:account_id>', endpoint='account')
+api.add_resource(Meals, '/api/accounts/<int:account_id>/meals', endpoint='meals')
 
 
 @app.route('/', defaults={'path': ''})
@@ -179,4 +231,4 @@ def _force_https():
 app.before_request(_force_https)
 app.secret_key = settings['secret_key']
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()

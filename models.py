@@ -30,3 +30,14 @@ class AccountRole(Model):
 
     class Meta:
         database = db
+
+
+class Meal(Model):
+    account = ForeignKeyField(Account)
+    meal_date = DateField(index=True)
+    meal_time = TimeField(index=True)
+    description = CharField()
+    calories = IntegerField()
+
+    class Meta:
+        database = db
