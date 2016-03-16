@@ -1,8 +1,22 @@
 @import "../components/bootstrap/less/variables.less";
 @import "../components/bootstrap/less/bootstrap.less";
-@import (inline) "../components/metisMenu/dist/metisMenu.css";
 @import "../components/startbootstrap-sb-admin-2/less/sb-admin-2.less";
-@import (inline) "../components/font-awesome/css/font-awesome.css";
+
+// font awesome... it was not getting the paths right
+@import "../components/font-awesome/less/variables.less";
+@fa-font-path: "../components/font-awesome/fonts";
+@import "../components/font-awesome/less/mixins.less";
+@import "../components/font-awesome/less/path.less";
+@import "../components/font-awesome/less/core.less";
+@import "../components/font-awesome/less/larger.less";
+@import "../components/font-awesome/less/fixed-width.less";
+@import "../components/font-awesome/less/list.less";
+@import "../components/font-awesome/less/bordered-pulled.less";
+@import "../components/font-awesome/less/spinning.less";
+@import "../components/font-awesome/less/rotated-flipped.less";
+@import "../components/font-awesome/less/stacked.less";
+@import "../components/font-awesome/less/icons.less";
+// font awesome done!
 
 .control-label {
   display: none;
@@ -14,4 +28,8 @@
 
 .control-label {
   font-size: 12px;
+}
+
+[ng\:cloak], [ng-cloak], [data-ng-cloak], [x-ng-cloak], .ng-cloak, .x-ng-cloak {
+  display: none !important;
 }

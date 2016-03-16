@@ -17,13 +17,28 @@ module.exports = function (grunt) {
                     include: ['apps/public'],
                     out: "static/js/public.min.js"
                 }
+            },
+            compileControlPanel: {
+                options: {
+                    optimize: "uglify2",
+                    preserveLicenseComments: false,
+                    generateSourceMaps: true,
+                    skipDirOptimize: false,
+
+                    baseUrl: './static/js',
+                    mainConfigFile: './static/js/require/config.js',
+                    name: "control-panel",
+                    include: ['apps/control-panel'],
+                    out: "static/js/control-panel.min.js"
+                }
             }
         },
         copy: {
             development: {
                 files: [
                     // includes files within path
-                    {expand: false, src: ['./static/js/public.js'], dest: './static/js/public.min.js'}
+                    {expand: false, src: ['./static/js/public.js'], dest: './static/js/public.min.js'},
+                    {expand: false, src: ['./static/js/control-panel.js'], dest: './static/js/control-panel.min.js'}
                 ]
             }
         },
@@ -33,7 +48,8 @@ module.exports = function (grunt) {
                     paths: ["static/less"]
                 },
                 files: {
-                    "static/css/public.min.css": "static/less/public.less"
+                    "static/css/public.min.css": "static/less/public.less",
+                    "static/css/control-panel.min.css": "static/less/control-panel.less"
                 }
             },
             prod: {
@@ -47,7 +63,8 @@ module.exports = function (grunt) {
                     ]
                 },
                 files: {
-                    "static/css/public.min.css": "static/less/public.less"
+                    "static/css/public.min.css": "static/less/public.less",
+                    "static/css/control-panel.min.css": "static/less/control-panel.less"
                 }
             }
         }
@@ -59,5 +76,5 @@ module.exports = function (grunt) {
 
     // Default task(s).
     grunt.registerTask('default', ['copy:development', 'less:development']);
-    grunt.registerTask('prod', ['requirejs:compilePublic', 'less:prod']);
+    grunt.registerTask('prod', ['requirejs:compilePublic', 'requirejs:compileControlPanel', 'less:prod']);
 };
