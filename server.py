@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, url_for, send_from_directory, make_response, abort
 from flask_restful import Resource, Api
 from itsdangerous import BadData, SignatureExpired
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 from validate_email import validate_email
 from config import settings
 import json
@@ -19,16 +19,16 @@ api = Api(app)
 class InvalidAPIUsage(Exception):
     status_code = 400
 
-    def __init__(self, message, status_code=None, payload=None):
+    def __init__(self, message, status_code=None, **kwargs):
         Exception.__init__(self)
         self.message = message
         if status_code is not None:
             self.status_code = status_code
-        self.payload = payload
+        self.payload = kwargs
 
     def to_dict(self):
         rv = dict(self.payload or ())
-        rv['message'] = self.message
+        rv['error'] = self.message
         return rv
 
 
@@ -63,6 +63,9 @@ class Accounts(DemoResource):
             account = models.Account(name=self.data['name'], email=self.data['email'],
                                      password=generate_password_hash(self.data['password']))
             account.save()
+
+            # make this account a user
+            models.AccountRole(account=account, role=models.Role.get(code='user')).save()
 
             update_token = utils.urlserializer.dumps({'id': account.id, 'active': True}, salt='account-update')
             url = url_for('public', path='apply-account-changes', account_id=account.id, token=update_token,
@@ -126,6 +129,44 @@ api.add_resource(Account, '/api/accounts/<int:account_id>', endpoint='account')
 @app.route('/<path:path>')
 def public(path):
     return send_from_directory('static', 'index.html')
+
+
+@app.route('/api/oauth', methods=['POST'])
+def login():
+    if any(f for f in ('grant_type', 'username', 'password') if f not in request.form) or \
+            any(k for k in request.form if k not in ('grant_type', 'username', 'password')):
+        raise InvalidAPIUsage('invalid_request')
+
+    if request.form['grant_type'] != 'password':
+        # only implementing Resource Owner Password Credentials Grant from RFC 6749
+        raise InvalidAPIUsage('unsupported_grant_type')
+
+    try:
+        account = models.Account.get(email=request.form['username'])
+    except models.Account.DoesNotExist:
+        raise InvalidAPIUsage('invalid_grant')
+
+    if not check_password_hash(account.password, request.form['password']):
+        raise InvalidAPIUsage('invalid_grant')
+
+    if not account.active:
+        update_token = utils.urlserializer.dumps({'id': account.id, 'active': True}, salt='account-update')
+        url = url_for('public', path='apply-account-changes', account_id=account.id, token=update_token,
+                      _external=True)
+        tasks.send_activation_email.delay(account.id, url)
+        raise InvalidAPIUsage('invalid_grant', error_description='Your account is not active. An email has been sent '
+                                                                 'to you with instructions to activate your account.')
+
+    roles = map(lambda x: x.code, models.Role.select().join(models.AccountRole).where(models.AccountRole.account == account))
+
+    # not generating refresh tokens as it's making it all the way to the user's browser. If an attacker got their
+    # hands on a refresh token, they could do anything without a time restriction
+    return jsonify({
+        'access_token': utils.urlserializer.dumps({'id': account.id, 'roles': roles}, salt='access-token'),
+        'token_type': 'bearer',
+        'expires_in': settings['oauth-token-expiration-seconds'],
+        'scope': ' '.join(roles)
+    })
 
 
 def _force_https():

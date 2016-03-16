@@ -14,3 +14,19 @@ class Account(Model):
 
     class Meta:
         database = db
+
+
+class Role(Model):
+    name = CharField()
+    code = CharField(unique=True)
+
+    class Meta:
+        database = db
+
+
+class AccountRole(Model):
+    account = ForeignKeyField(Account)
+    role = ForeignKeyField(Role)
+
+    class Meta:
+        database = db

@@ -1,5 +1,6 @@
 settings = {
     'link-expiration-seconds': 5 * 60,  # used on the email links
+    'oauth-token-expiration-seconds': 3600,  # how long will the oauth tokens be good for? after this time, the user needs to login again
     'database': {
         'name': 'toptaldemo',
         'params': {

@@ -19,8 +19,8 @@
                         reg.$save(function(){
                             _this.success = true;
                         }, function(response){
-                            if(response.data.message){
-                                _this.error_message = response.data.message;
+                            if(response.data.error){
+                                _this.error_message = response.data.error;
                             } else {
                                 _this.error_message = 'Unexpected error ' + response.status;
                             }

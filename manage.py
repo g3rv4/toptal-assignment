@@ -1,4 +1,4 @@
-from models import *
+import models
 import peewee
 import argparse
 
@@ -8,4 +8,7 @@ parser.add_argument("--action", help="action to execute", required=True, choices
 args = parser.parse_known_args()[0]
 
 if args.action == 'create-database':
-    db.create_tables(peewee.Model.__subclasses__())
+    models.db.create_tables(peewee.Model.__subclasses__())
+    models.Role(name='User', code='user').save()
+    models.Role(name='User Manager', code='user-manager').save()
+    models.Role(name='Admin', code='admin').save()
