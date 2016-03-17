@@ -4,11 +4,13 @@ from itsdangerous import BadData, SignatureExpired
 from werkzeug.security import generate_password_hash, check_password_hash
 from validate_email import validate_email
 from config import settings
+from dateutil.parser import parse as parse_date
 import json
 import models
 import utils
 import tasks
 import logger
+import re
 
 
 log = logger.getLogger(__name__)
@@ -44,13 +46,11 @@ def require_auth(roles=None, accountid_free_roles=[]):
                 if kwargs['account_id'] != token['id'] and not any(r for r in accountid_free_roles if r in token['roles']):
                     abort(401, 'Unauthorized')
 
-            try:
-                account = models.Account.get(id=kwargs['account_id'] if 'account_id' in kwargs else token['id'])
-            except models.Account.DoesNotExist:
-                abort(404, 'Not Found')
-
             if 'kwargs' in funct.__code__.co_varnames or 'account' in funct.__code__.co_varnames:
-                kwargs['account'] = account
+                try:
+                    kwargs['account'] = models.Account.get(id=kwargs['account_id'] if 'account_id' in kwargs else token['id'])
+                except models.Account.DoesNotExist:
+                    abort(404, 'Not Found')
 
             if 'kwargs' in funct.__code__.co_varnames or 'roles' in funct.__code__.co_varnames:
                 kwargs['roles'] = token['roles']
@@ -59,6 +59,12 @@ def require_auth(roles=None, accountid_free_roles=[]):
 
         return decorated_function
     return decorator
+
+
+def created_response(url_name, **kwargs):
+    resp = make_response('', 201)
+    resp.headers['Location'] = url_for(url_name, _external=True, **kwargs)
+    return resp
 
 
 class InvalidAPIUsage(Exception):
@@ -117,16 +123,14 @@ class Accounts(DemoResource):
                           _external=True)
 
             tasks.send_activation_email.delay(account.id, url)
-            resp = make_response('', 201)
-            resp.headers['Location'] = url_for('account', account_id=account.id)
-            return resp
+            return created_response('account', account_id=account.id)
 
 
 class Account(DemoResource):
     def put(self, account_id):
-        data = json.loads(request.data)
+        self.load_data()
         try:
-            update_data = utils.urlserializer.loads(data['update_token'], salt='account-update', max_age=settings['link-expiration-seconds'])
+            update_data = utils.urlserializer.loads(self.data['update_token'], salt='account-update', max_age=settings['link-expiration-seconds'])
         except SignatureExpired, e:
             encoded_payload = e.payload
             try:
@@ -163,7 +167,32 @@ class Account(DemoResource):
 class Meals(DemoResource):
     @require_auth(roles=['user', 'admin'], accountid_free_roles=['admin'])
     def post(self, account_id, account):
-        return '', 201
+        self.load_data()
+
+        if any(f for f in ('date', 'time', 'description', 'calories') if f not in self.data):
+            abort(400, 'Missing Parameter(s)')
+
+        if not re.match('[0-9]{4}-[0-9]{2}-[0-9]{2}$', self.data['date']):
+            abort(400, 'Invalid date format')
+
+        try:
+            parse_date(self.data['date'])
+        except:
+            abort(400, 'Invalid date')
+
+        if not re.match('[0-9]{2}:[0-9]{2}:[0-9]{2}$', self.data['time']):
+            abort(400, 'Invalid time format')
+
+        try:
+            meal_dt = parse_date('%s %s' % (self.data['date'], self.data['time']))
+        except:
+            abort(400, 'Invalid time')
+
+        meal = models.Meal(account=account, meal_date=meal_dt.date(), meal_time=meal_dt.strftime('%H:%M:%S'),
+                           description=self.data['description'], calories=self.data['calories'])
+        meal.save()
+
+        return created_response('meal', account_id=account.id, meal_id=meal.id)
 
 
 @app.errorhandler(InvalidAPIUsage)
@@ -175,6 +204,7 @@ def handle_invalid_usage(error):
 api.add_resource(Accounts, '/api/accounts', endpoint='accounts')
 api.add_resource(Account, '/api/accounts/<int:account_id>', endpoint='account')
 api.add_resource(Meals, '/api/accounts/<int:account_id>/meals', endpoint='meals')
+api.add_resource(Meals, '/api/accounts/<int:account_id>/meals/<int:meal_id>', endpoint='meal')
 
 
 @app.route('/', defaults={'path': ''})
