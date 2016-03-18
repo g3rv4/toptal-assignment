@@ -1,16 +1,19 @@
 from flask import Flask, request, jsonify, url_for, send_from_directory, make_response, abort
+from flask.views import MethodViewType
 from flask_restful import Resource, Api
 from itsdangerous import BadData, SignatureExpired
 from werkzeug.security import generate_password_hash, check_password_hash
 from validate_email import validate_email
 from config import settings
 from dateutil.parser import parse as parse_date
+import wrapt
 import json
+import types
 import models
 import utils
 import tasks
 import logger
-import re
+import rest_serializers
 
 
 log = logger.getLogger(__name__)
@@ -21,43 +24,56 @@ api = Api(app)
 # decorator to allow certain methods to require logged in users. It can also enforce certain roles. If the function
 # receives an account or a roles parameter, those get populated by the decorator as well
 def require_auth(roles=None, accountid_free_roles=[]):
-    def decorator(funct):
-        def decorated_function(*args, **kwargs):
-            # check if the user is at least sending a bearer token
-            if 'Authorization' not in request.headers or len(request.headers['Authorization']) < 8 or request.headers['Authorization'][:7] != 'Bearer ':
-                abort(401, 'Unauthorized')
-
-            token = request.headers['Authorization'][7:]
-            try:
-                token = utils.urlserializer.loads(token, settings['oauth-token-expiration-seconds'], salt='access-token')
-            except BadData, e:
-                log.error(e)
-                abort(401, 'Unauthorized')
-
-            if roles and not any(r for r in roles if r in token['roles']):
-                abort(401, 'Unauthorized')
-
-            if 'account_id' in kwargs:
-                # if the value is 0, the user meant the owner of the token
-                kwargs['account_id'] = kwargs['account_id'] or token['id']
-
-                # if the function is receiving an account_id that's not the token's owner, then we require the user
-                # to have one of the accountid_free_roles
-                if kwargs['account_id'] != token['id'] and not any(r for r in accountid_free_roles if r in token['roles']):
+    def decorator(funct_or_class):
+        def decorate_function(funct):
+            def decorated_function(*args, **kwargs):
+                # check if the user is at least sending a bearer token
+                if 'Authorization' not in request.headers or len(request.headers['Authorization']) < 8 or request.headers['Authorization'][:7] != 'Bearer ':
                     abort(401, 'Unauthorized')
 
-            if 'kwargs' in funct.__code__.co_varnames or 'account' in funct.__code__.co_varnames:
+                token = request.headers['Authorization'][7:]
                 try:
-                    kwargs['account'] = models.Account.get(id=kwargs['account_id'] if 'account_id' in kwargs else token['id'])
+                    token = utils.urlserializer.loads(token, settings['oauth-token-expiration-seconds'], salt='access-token')
+                except BadData, e:
+                    log.error(e)
+                    abort(401, 'Unauthorized')
+
+                if roles and not any(r for r in roles if r in token['roles']):
+                    abort(401, 'Unauthorized')
+
+                account_id = (kwargs['account_id'] if 'account_id' in kwargs else 0) or token['id']
+                if account_id != token['id'] and not any(r for r in accountid_free_roles if r in token['roles']):
+                    abort(401, 'Unauthorized')
+
+                try:
+                    account = models.Account.get(id=account_id)
                 except models.Account.DoesNotExist:
                     abort(404, 'Not Found')
 
-            if 'kwargs' in funct.__code__.co_varnames or 'roles' in funct.__code__.co_varnames:
-                kwargs['roles'] = token['roles']
+                if 'account_id' in funct.__code__.co_varnames:
+                    kwargs['account_id'] = token['id']
 
-            return funct(*args, **kwargs)
+                if 'account' in funct.__code__.co_varnames:
+                    kwargs['account'] = account
 
-        return decorated_function
+                if 'roles' in funct.__code__.co_varnames:
+                    kwargs['roles'] = token['roles']
+
+                if len(args) and isinstance(args[0], Resource):
+                    args[0].account = account
+                    args[0].roles = token['roles']
+
+                return funct(*args, **kwargs)
+
+            decorated_function.triggering_pre_execute = True
+            return decorated_function
+
+        if isinstance(funct_or_class, types.FunctionType):
+            return decorate_function(funct_or_class)
+        else:
+            for action in (a for a in ('get', 'post', 'put', 'delete') if hasattr(funct_or_class, a)):
+                setattr(funct_or_class, action, decorate_function(getattr(funct_or_class, action)))
+            return funct_or_class
     return decorator
 
 
@@ -83,21 +99,35 @@ class InvalidAPIUsage(Exception):
         return rv
 
 
-class DemoResource(Resource):
-    def __init__(self):
-        self.data = None
+class ResourceMeta(MethodViewType):
+    def __new__(cls, name, bases, attrs):
+        @wrapt.decorator
+        def add_pre_execute(wrapped, instance, args, kwargs):
+            attrs['pre_execute'](instance, *args, **kwargs)
+            return wrapped(*args, **kwargs)
 
-    def load_data(self):
-        try:
-            self.data = json.loads(request.data)
-        except:
-            raise InvalidAPIUsage('Invalid JSON received')
+        @wrapt.decorator
+        def add_json_parse(wrapped, instance, args, kwargs):
+            try:
+                instance.data = json.loads(request.data)
+            except:
+                raise InvalidAPIUsage('Invalid JSON received')
+            return wrapped(*args, **kwargs)
+
+        for action in (a for a in attrs if a in ('get', 'post', 'put', 'delete')):
+            if action in ('post', 'put'):
+                attrs[action] = add_json_parse(attrs[action])
+
+            if 'pre_execute' in attrs:
+                attrs[action] = add_pre_execute(attrs[action])
+
+        return super(ResourceMeta, cls).__new__(cls, name, bases, attrs)
 
 
-class Accounts(DemoResource):
+class Accounts(Resource):
+    __metaclass__ = ResourceMeta
+
     def post(self):
-        self.load_data()
-
         if any(f for f in ('email', 'password', 'name') if f not in self.data):
             raise InvalidAPIUsage('Missing parameter(s)')
         if not validate_email(self.data['email']):
@@ -126,9 +156,10 @@ class Accounts(DemoResource):
             return created_response('account', account_id=account.id)
 
 
-class Account(DemoResource):
+class Account(Resource):
+    __metaclass__ = ResourceMeta
+
     def put(self, account_id):
-        self.load_data()
         try:
             update_data = utils.urlserializer.loads(self.data['update_token'], salt='account-update', max_age=settings['link-expiration-seconds'])
         except SignatureExpired, e:
@@ -164,35 +195,90 @@ class Account(DemoResource):
         return '', 204
 
 
-class Meals(DemoResource):
-    @require_auth(roles=['user', 'admin'], accountid_free_roles=['admin'])
-    def post(self, account_id, account):
-        self.load_data()
+@require_auth(roles=['user', 'admin'], accountid_free_roles=['admin'])
+class Meals(Resource):
+    __metaclass__ = ResourceMeta
 
+    def post(self, account_id):
         if any(f for f in ('date', 'time', 'description', 'calories') if f not in self.data):
             abort(400, 'Missing Parameter(s)')
 
-        if not re.match('[0-9]{4}-[0-9]{2}-[0-9]{2}$', self.data['date']):
-            abort(400, 'Invalid date format')
-
-        try:
-            parse_date(self.data['date'])
-        except:
+        if not utils.is_valid_date(self.data['date']):
             abort(400, 'Invalid date')
 
-        if not re.match('[0-9]{2}:[0-9]{2}:[0-9]{2}$', self.data['time']):
+        if not utils.is_valid_time(self.data['time']):
             abort(400, 'Invalid time format')
 
-        try:
-            meal_dt = parse_date('%s %s' % (self.data['date'], self.data['time']))
-        except:
-            abort(400, 'Invalid time')
+        if not isinstance(self.data['calories'], int) or self.data['calories'] <= 0:
+            abort(400, 'Invalid calories value')
 
-        meal = models.Meal(account=account, meal_date=meal_dt.date(), meal_time=meal_dt.strftime('%H:%M:%S'),
+        meal_dt = parse_date('%s %s' % (self.data['date'], self.data['time']))
+
+        meal = models.Meal(account=self.account, date=meal_dt.date(), time=self.data['time'],
                            description=self.data['description'], calories=self.data['calories'])
         meal.save()
 
-        return created_response('meal', account_id=account.id, meal_id=meal.id)
+        return created_response('meal', account_id=self.account.id, meal_id=meal.id)
+
+    def get(self, account_id):
+        meals = models.Meal.select().where(models.Meal.account == self.account)
+
+        if 'meal-date-from' in request.args:
+            meals = meals.where(models.Meal.meal_date)
+
+        return rest_serializers.serialize_meals(meals)
+
+
+@require_auth(roles=['user', 'admin'], accountid_free_roles=['admin'])
+class Meal(Resource):
+    __metaclass__ = ResourceMeta
+
+    def __init__(self):
+        self.meal = None
+        super(Meal, self).__init__()
+
+    def pre_execute(self, *args, **kwargs):
+        try:
+            self.meal = models.Meal.get(models.Meal.id == kwargs['meal_id'], models.Meal.account == self.account)
+        except models.Meal.DoesNotExist:
+            abort(404, 'Meal not found')
+
+    def get(self, account_id, meal_id):
+        return jsonify(rest_serializers.serialize_meal(self.meal))
+
+    def delete(self, account_id, meal_id):
+        self.meal.delete_instance()
+        return '', 204
+
+    def put(self, account_id, meal_id):
+        if any(k for k in self.data if k not in ('id', 'account', 'date', 'time', 'description', 'calories')):
+            raise InvalidAPIUsage('Invalid parameters')
+
+        # skipping id and account fields
+
+        if 'date' in self.data:
+            if not utils.is_valid_date(self.data['date']):
+                raise InvalidAPIUsage('Invalid date')
+
+            self.meal.date = parse_date(self.data['date']).date()
+
+        if 'time' in self.data:
+            if not utils.is_valid_time(self.data['time']):
+                raise InvalidAPIUsage('Invalid time')
+
+            self.meal.time = self.data['time']
+
+        if 'description' in self.data:
+            self.meal.description = self.data['description']
+
+        if 'calories' in self.data:
+            if not isinstance(self.data['calories'], int) or self.data['calories'] <= 0:
+                abort(400, 'Invalid calories value')
+
+            self.meal.calories = self.data['calories']
+
+        self.meal.save()
+        return jsonify(rest_serializers.serialize_meal(self.meal))
 
 
 @app.errorhandler(InvalidAPIUsage)
@@ -204,7 +290,7 @@ def handle_invalid_usage(error):
 api.add_resource(Accounts, '/api/accounts', endpoint='accounts')
 api.add_resource(Account, '/api/accounts/<int:account_id>', endpoint='account')
 api.add_resource(Meals, '/api/accounts/<int:account_id>/meals', endpoint='meals')
-api.add_resource(Meals, '/api/accounts/<int:account_id>/meals/<int:meal_id>', endpoint='meal')
+api.add_resource(Meal, '/api/accounts/<int:account_id>/meals/<int:meal_id>', endpoint='meal')
 
 
 @app.route('/', defaults={'path': ''})

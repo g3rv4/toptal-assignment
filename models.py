@@ -34,8 +34,8 @@ class AccountRole(Model):
 
 class Meal(Model):
     account = ForeignKeyField(Account)
-    meal_date = DateField(index=True)
-    meal_time = TimeField(index=True)
+    date = DateField(index=True)
+    time = TimeField(index=True)
     description = CharField()
     calories = IntegerField()
 

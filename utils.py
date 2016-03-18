@@ -1,10 +1,12 @@
 from itsdangerous import URLSafeTimedSerializer
+from dateutil.parser import parse as parse_date
 from config import settings
 from server import app
 import sendgrid
 import requests
 import json
 import logger
+import re
 
 
 log = logger.getLogger(__name__)
@@ -48,3 +50,23 @@ def send_email(account, subject, body, cc=None, bcc=None):
 
     status, msg = sg.send(message)
     log.debug('Sendgrid message sent to %s, status %i, message: %s' % (to, status, msg))
+
+
+def is_valid_date(date):
+    if re.match('[0-9]{4}-[0-9]{2}-[0-9]{2}$', date):
+        try:
+            parse_date(date)
+            return True
+        except:
+            pass
+    return False
+
+
+def is_valid_time(time):
+    if re.match('[0-9]{2}:[0-9]{2}:[0-9]{2}$', time):
+        try:
+            parse_date('2015-01-01 %s' % time)
+            return True
+        except:
+            pass
+    return False
