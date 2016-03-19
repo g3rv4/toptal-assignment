@@ -40,7 +40,7 @@ class APIError(HTTPException):
 
 # decorator to allow certain methods to require logged in users. It can also enforce certain roles. If the function
 # receives an account or a roles parameter, those get populated by the decorator as well
-def verify_token_get_account(roles=None, accountid_free_roles=[], kwargs={}):
+def verify_token_get_account(roles=None, accountid_free_roles=[], account_should_have_roles=[], kwargs={}):
     # check if the user is at least sending a bearer token
     if 'Authorization' not in request.headers or len(request.headers['Authorization']) < 8 or request.headers['Authorization'][:7] != 'Bearer ':
         raise APIError('Unauthorized', 401)
@@ -59,14 +59,21 @@ def verify_token_get_account(roles=None, accountid_free_roles=[], kwargs={}):
     if account_id != token['id'] and not any(r for r in accountid_free_roles if r in token['roles']):
         raise APIError('Unauthorized', 401)
 
+    # this is the destination account, to allow certain actions only if the account the request
+    # is affecting if that account has certain roles
+    if account_should_have_roles:
+        roles = map(lambda x: x.code, models.Role.select().join(models.AccountRole).where(models.AccountRole.account == models.get_active_account(id=account_id)))
+        if not any(r for r in account_should_have_roles if r in roles):
+            raise APIError("This action can't be performed on this account")
+
     return account_id, token
 
 
-def require_auth(roles=None, accountid_free_roles=[]):
+def require_auth(roles=None, accountid_free_roles=[], account_should_have_roles=[]):
     def decorator(funct_or_class):
         def decorate_function(funct):
             def decorated_function(*args, **kwargs):
-                account_id, token = verify_token_get_account(roles, accountid_free_roles, kwargs)
+                account_id, token = verify_token_get_account(roles, accountid_free_roles, account_should_have_roles, kwargs)
 
                 try:
                     account = models.get_active_account(id=account_id)
@@ -259,9 +266,9 @@ class Account(DemoResource):
 
         # verify authorization
         if 'roles' in self.data:
-            account_id, token = verify_token_get_account(['admin'], ['admin'], {'account_id': account_id})
+            account_id, token = verify_token_get_account(['admin'], ['admin'], kwargs={'account_id': account_id})
         else:
-            account_id, token = verify_token_get_account(['user', 'user-manager', 'admin'], ['user-manager', 'admin'], {'account_id': account_id})
+            account_id, token = verify_token_get_account(['user', 'user-manager', 'admin'], ['user-manager', 'admin'], kwargs={'account_id': account_id})
 
         try:
             account = models.get_active_account(id=account_id)
@@ -335,7 +342,7 @@ class Account(DemoResource):
         return '', 204
 
 
-@require_auth(roles=['user', 'admin'], accountid_free_roles=['admin'])
+@require_auth(roles=['user', 'admin'], accountid_free_roles=['admin'], account_should_have_roles=['user'])
 class Meals(DemoResource):
     def post(self, account_id):
         if any(f for f in ('date', 'time', 'description', 'calories') if f not in self.data):
@@ -390,7 +397,7 @@ class Meals(DemoResource):
         return self.return_paginated(meals, 'meals', {'account_id': account_id})
 
 
-@require_auth(roles=['user', 'admin'], accountid_free_roles=['admin'])
+@require_auth(roles=['user', 'admin'], accountid_free_roles=['admin'], account_should_have_roles=['user'])
 class Meal(DemoResource):
     def pre_execute(self, *args, **kwargs):
         try:
