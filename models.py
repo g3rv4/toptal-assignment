@@ -1,22 +1,34 @@
 from peewee import *
 from config import settings
 import datetime
+import rest_serializers
 
 db = MySQLDatabase(settings['database']['name'], **settings['database']['params'])
 
 
-class Account(Model):
+class DemoModel(Model):
+    def serialize(self):
+        if hasattr(rest_serializers, 'serialize_%s' % self._meta.db_table):
+            return getattr(rest_serializers, 'serialize_%s' % self._meta.db_table)(self)
+        raise Exception('Serializer not set for %s' % self._meta.db_table)
+
+
+class Account(DemoModel):
     name = CharField()
-    email = CharField(unique=True)
+    email = CharField()
     password = CharField()
     active = BooleanField(default=False)
+    deleted = BooleanField(default=False)
     created_dt = DateTimeField(default=datetime.datetime.now)
 
     class Meta:
         database = db
+        indexes = (
+            (('email', 'deleted'), False),
+        )
 
 
-class Role(Model):
+class Role(DemoModel):
     name = CharField()
     code = CharField(unique=True)
 
@@ -24,7 +36,7 @@ class Role(Model):
         database = db
 
 
-class AccountRole(Model):
+class AccountRole(DemoModel):
     account = ForeignKeyField(Account)
     role = ForeignKeyField(Role)
 
@@ -32,7 +44,7 @@ class AccountRole(Model):
         database = db
 
 
-class Meal(Model):
+class Meal(DemoModel):
     account = ForeignKeyField(Account)
     date = DateField(index=True)
     time = TimeField(index=True)
@@ -41,3 +53,7 @@ class Meal(Model):
 
     class Meta:
         database = db
+
+
+def get_active_account(*args, **kwargs):
+    return Account.get(deleted=False, *args, **kwargs)

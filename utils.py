@@ -1,5 +1,6 @@
 from itsdangerous import URLSafeTimedSerializer
 from dateutil.parser import parse as parse_date
+from validate_email import validate_email
 from config import settings
 from server import app
 import sendgrid
@@ -13,10 +14,10 @@ log = logger.getLogger(__name__)
 urlserializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 
 
-def send_email(account, subject, body, cc=None, bcc=None):
+def send_email(account, subject, body, cc=None, bcc=None, to=None):
     cc = cc or []
     bcc = bcc or []
-    to = [account.email]
+    to = [to] if to else [account.email]
     if not isinstance(cc, list):
         cc = [cc]
     if not isinstance(bcc, list):
@@ -70,3 +71,7 @@ def is_valid_time(time):
         except:
             pass
     return False
+
+
+def is_valid_email(email):
+    return validate_email(email) and re.match(r'.*@.+\.[a-z]+$', email)

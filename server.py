@@ -1,9 +1,9 @@
-from flask import Flask, request, jsonify, url_for, send_from_directory, make_response, abort
+from flask import Flask, request, jsonify, url_for, send_from_directory, make_response
 from flask.views import MethodViewType
 from flask_restful import Resource, Api
 from itsdangerous import BadData, SignatureExpired
 from werkzeug.security import generate_password_hash, check_password_hash
-from validate_email import validate_email
+from werkzeug.exceptions import HTTPException
 from config import settings
 from dateutil.parser import parse as parse_date
 import wrapt
@@ -13,7 +13,6 @@ import models
 import utils
 import tasks
 import logger
-import rest_serializers
 
 
 log = logger.getLogger(__name__)
@@ -21,37 +20,61 @@ app = Flask(__name__)
 api = Api(app)
 
 
+class AppError(Exception):
+    def __init__(self, message, status_code=None, *args, **kwargs):
+        super(AppError, self).__init__()
+
+        self.code = status_code or 400
+        kwargs['error'] = message
+        self.data = kwargs
+
+
+class APIError(HTTPException):
+    def __init__(self, message, status_code=None, description=None, response=None, **kwargs):
+        super(APIError, self).__init__(description, response)
+
+        self.code = status_code or 400
+        kwargs['error'] = message
+        self.data = kwargs
+
+
 # decorator to allow certain methods to require logged in users. It can also enforce certain roles. If the function
 # receives an account or a roles parameter, those get populated by the decorator as well
+def verify_token_get_account(roles=None, accountid_free_roles=[], kwargs={}):
+    # check if the user is at least sending a bearer token
+    if 'Authorization' not in request.headers or len(request.headers['Authorization']) < 8 or request.headers['Authorization'][:7] != 'Bearer ':
+        raise APIError('Unauthorized', 401)
+
+    token = request.headers['Authorization'][7:]
+    try:
+        token = utils.urlserializer.loads(token, settings['oauth-token-expiration-seconds'], salt='access-token')
+    except BadData, e:
+        log.error(e)
+        raise APIError('Unauthorized', 401)
+
+    if roles and not any(r for r in roles if r in token['roles']):
+        raise APIError('Unauthorized', 401)
+
+    account_id = (kwargs['account_id'] if 'account_id' in kwargs else 0) or token['id']
+    if account_id != token['id'] and not any(r for r in accountid_free_roles if r in token['roles']):
+        raise APIError('Unauthorized', 401)
+
+    return account_id, token
+
+
 def require_auth(roles=None, accountid_free_roles=[]):
     def decorator(funct_or_class):
         def decorate_function(funct):
             def decorated_function(*args, **kwargs):
-                # check if the user is at least sending a bearer token
-                if 'Authorization' not in request.headers or len(request.headers['Authorization']) < 8 or request.headers['Authorization'][:7] != 'Bearer ':
-                    abort(401, 'Unauthorized')
-
-                token = request.headers['Authorization'][7:]
-                try:
-                    token = utils.urlserializer.loads(token, settings['oauth-token-expiration-seconds'], salt='access-token')
-                except BadData, e:
-                    log.error(e)
-                    abort(401, 'Unauthorized')
-
-                if roles and not any(r for r in roles if r in token['roles']):
-                    abort(401, 'Unauthorized')
-
-                account_id = (kwargs['account_id'] if 'account_id' in kwargs else 0) or token['id']
-                if account_id != token['id'] and not any(r for r in accountid_free_roles if r in token['roles']):
-                    abort(401, 'Unauthorized')
+                account_id, token = verify_token_get_account(roles, accountid_free_roles, kwargs)
 
                 try:
-                    account = models.Account.get(id=account_id)
+                    account = models.get_active_account(id=account_id)
                 except models.Account.DoesNotExist:
-                    abort(404, 'Not Found')
+                    raise APIError('Not Found', 404)
 
                 if 'account_id' in funct.__code__.co_varnames:
-                    kwargs['account_id'] = token['id']
+                    kwargs['account_id'] = account_id
 
                 if 'account' in funct.__code__.co_varnames:
                     kwargs['account'] = account
@@ -60,6 +83,7 @@ def require_auth(roles=None, accountid_free_roles=[]):
                     kwargs['roles'] = token['roles']
 
                 if len(args) and isinstance(args[0], Resource):
+                    args[0].logged_in_account_id = token['id']
                     args[0].account = account
                     args[0].roles = token['roles']
 
@@ -83,22 +107,6 @@ def created_response(url_name, **kwargs):
     return resp
 
 
-class InvalidAPIUsage(Exception):
-    status_code = 400
-
-    def __init__(self, message, status_code=None, **kwargs):
-        Exception.__init__(self)
-        self.message = message
-        if status_code is not None:
-            self.status_code = status_code
-        self.payload = kwargs
-
-    def to_dict(self):
-        rv = dict(self.payload or ())
-        rv['error'] = self.message
-        return rv
-
-
 class ResourceMeta(MethodViewType):
     def __new__(cls, name, bases, attrs):
         @wrapt.decorator
@@ -111,7 +119,7 @@ class ResourceMeta(MethodViewType):
             try:
                 instance.data = json.loads(request.data)
             except:
-                raise InvalidAPIUsage('Invalid JSON received')
+                raise APIError('Invalid JSON received')
             return wrapped(*args, **kwargs)
 
         for action in (a for a in attrs if a in ('get', 'post', 'put', 'delete')):
@@ -124,22 +132,73 @@ class ResourceMeta(MethodViewType):
         return super(ResourceMeta, cls).__new__(cls, name, bases, attrs)
 
 
-class Accounts(Resource):
+class DemoResource(Resource):
     __metaclass__ = ResourceMeta
+
+    def return_paginated(self, query, endpoint, urlparams):
+        try:
+            page = int(request.args['page'])
+        except:
+            page = 1
+
+        try:
+            items_per_page = int(request.args['items-per-page'])
+        except:
+            items_per_page = 15
+
+        items_per_page = items_per_page if items_per_page <= 100 else 100
+        total_items = query.count()
+
+        for k in request.args:
+            urlparams[k] = request.args[k]
+
+        next_url = previous_url = None
+        if total_items > page * items_per_page:
+            urlparams['page'] = page + 1
+            next_url = url_for(endpoint, _external=True, **urlparams)
+
+        if page > 1:
+            urlparams['page'] = page - 1
+            previous_url = url_for(endpoint, _external=True, **urlparams)
+
+        query = query.offset((page - 1) * items_per_page).limit(items_per_page)
+
+        return {
+            'data': map(lambda x: x.serialize(), query),
+            'pagination': {
+                'total_items': total_items,
+                'next': next_url,
+                'previous': previous_url
+            }
+        }
+
+
+class Accounts(DemoResource):
+    @require_auth(roles=['user-manager', 'admin'])
+    def get(self):
+        accounts = models.Account.select().where(models.Account.deleted==False).order_by(models.Account.name)
+
+        if 'name' in request.args:
+            accounts = accounts.where(models.Account.name % ('%%%s%%' % request.args['name']))
+
+        if 'email' in request.args:
+            accounts = accounts.where(models.Account.email % ('%%%s%%' % request.args['email']))
+
+        return self.return_paginated(accounts, 'accounts', {})
 
     def post(self):
         if any(f for f in ('email', 'password', 'name') if f not in self.data):
-            raise InvalidAPIUsage('Missing parameter(s)')
-        if not validate_email(self.data['email']):
-            raise InvalidAPIUsage('Invalid email address')
+            raise APIError('Missing parameter(s)')
+        if not utils.is_valid_email(self.data['email']):
+            raise APIError('Invalid email address')
         if len(self.data['password']) < 8:
-            raise InvalidAPIUsage('Invalid password')
+            raise APIError('Invalid password')
         if len(self.data['name']) < 3:
-            raise InvalidAPIUsage('Invalid name')
+            raise APIError('Invalid name')
 
         try:
-            models.Account.get(email=self.data['email'])
-            raise InvalidAPIUsage('Email already registered')
+            models.get_active_account(email=self.data['email'])
+            raise APIError('Email already registered')
         except models.Account.DoesNotExist:
             account = models.Account(name=self.data['name'], email=self.data['email'],
                                      password=generate_password_hash(self.data['password']))
@@ -152,14 +211,12 @@ class Accounts(Resource):
             url = url_for('public', path='apply-account-changes', account_id=account.id, token=update_token,
                           _external=True)
 
-            tasks.send_activation_email.delay(account.id, url)
+            tasks.send_activation_email.delay(account.id, url, update_token)
             return created_response('account', account_id=account.id)
 
 
-class Account(Resource):
-    __metaclass__ = ResourceMeta
-
-    def put(self, account_id):
+class Account(DemoResource):
+    def update_account(self, account_id):
         try:
             update_data = utils.urlserializer.loads(self.data['update_token'], salt='account-update', max_age=settings['link-expiration-seconds'])
         except SignatureExpired, e:
@@ -171,21 +228,21 @@ class Account(Resource):
                 update_token = utils.urlserializer.dumps(decoded_payload, salt='account-update')
                 url = url_for('public', path='apply-account-changes', account_id=account_id, token=update_token,
                               _external=True)
-                tasks.send_account_update_email.delay(account_id, url)
+                tasks.send_account_update_email.delay(account_id, url, update_token, decoded_payload.get('email'))
             except BadData:
-                abort(400, 'Invalid token')
-            abort(400, 'Your token has expired. We have sent you a new link to your email')
+                raise APIError('Invalid token')
+            raise APIError('Your token has expired. We have sent you a new link to your email')
         except BadData, e:
             log.error(e)
-            abort(400, 'Invalid token')
+            raise APIError('Invalid token')
 
         if update_data['id'] != account_id:
-            abort(400, 'Invalid token')
+            raise APIError('Invalid token')
 
         try:
-            account = models.Account.get(id=account_id)
+            account = models.get_active_account(id=account_id)
         except models.Account.DoesNotExist:
-            abort(404, 'Account does not exist')
+            raise APIError('Account does not exist', 404)
 
         del update_data['id']
         for k in update_data:
@@ -194,23 +251,104 @@ class Account(Resource):
         account.save()
         return '', 204
 
+    def put(self, account_id):
+        # if the account is being updated through the update_token, then we don't need to authenticate
+        # the user (they may not even be able to log in)
+        if 'update_token' in self.data:
+            return self.update_account(account_id)
+
+        # verify authorization
+        if 'roles' in self.data:
+            account_id, token = verify_token_get_account(['admin'], ['admin'], {'account_id': account_id})
+        else:
+            account_id, token = verify_token_get_account(['user', 'user-manager', 'admin'], ['user-manager', 'admin'], {'account_id': account_id})
+
+        try:
+            account = models.get_active_account(id=account_id)
+        except models.Account.DoesNotExist:
+            raise APIError('Account not found', 404)
+
+        # perform updates
+        if 'roles' in self.data:
+            if not isinstance(self.data['roles'], list) or any(r for r in self.data['roles'] if not isinstance(r, basestring)):
+                raise APIError('Invalid roles value')
+
+            final_roles = models.Role.select().where(models.Role.code << self.data['roles'])
+            if len(final_roles) != len(self.data['roles']):
+                raise APIError('Invalid roles value')
+
+            current_roles = models.Role.select().join(models.AccountRole).where(models.AccountRole.account == account)
+
+            # handle deletions
+            for role in [r for r in current_roles if r not in final_roles]:
+                models.AccountRole.get(models.AccountRole.account == account, models.AccountRole.role == role).delete_instance()
+
+            # handle additions
+            for role in [r for r in final_roles if r not in current_roles]:
+                models.AccountRole(account=account, role=role).save()
+
+        if 'name' in self.data:
+            if not isinstance(self.data['name'], basestring):
+                raise APIError('Invalid name')
+
+            account.name = self.data['name']
+
+        if 'email' in self.data:
+            if not utils.is_valid_email(self.data['email']):
+                raise APIError('Invalid email')
+
+            if models.get_active_account(email=self.data['email']):
+                raise APIError('Email already used')
+
+            update_token = utils.urlserializer.dumps({'id': account.id, 'email': self.data['email']}, salt='account-update')
+            url = url_for('public', path='apply-account-changes', account_id=account.id, token=update_token,
+                          _external=True)
+            tasks.send_account_update_email.delay(account.id, url, update_token, email=self.data['email'])
+
+        if 'password' in self.data:
+            if len(self.data['password']) < 8:
+                raise APIError('Invalid password')
+
+            if 'current_password' not in self.data:
+                raise APIError('Missing current_password')
+
+            if not check_password_hash(account.password, self.data['current_password']):
+                raise APIError('Invalid current_password')
+
+            account.password = generate_password_hash(self.data['password'])
+
+        account.save()
+        return '', 204
+
+    @require_auth(roles=['user', 'user-manager', 'admin'], accountid_free_roles=['admin', 'user-manager'])
+    def get(self, account_id):
+        return self.account.serialize()
+
+    @require_auth(roles=['user-manager', 'admin'], accountid_free_roles=['admin', 'user-manager'])
+    def delete(self, account_id):
+        if self.logged_in_account_id == account_id:
+            raise APIError("You can't delete your own account")
+
+        self.account.deleted = True
+        self.account.save()
+
+        return '', 204
+
 
 @require_auth(roles=['user', 'admin'], accountid_free_roles=['admin'])
-class Meals(Resource):
-    __metaclass__ = ResourceMeta
-
+class Meals(DemoResource):
     def post(self, account_id):
         if any(f for f in ('date', 'time', 'description', 'calories') if f not in self.data):
-            abort(400, 'Missing Parameter(s)')
+            raise APIError('Missing Parameter(s)')
 
         if not utils.is_valid_date(self.data['date']):
-            abort(400, 'Invalid date')
+            raise APIError('Invalid date')
 
         if not utils.is_valid_time(self.data['time']):
-            abort(400, 'Invalid time format')
+            raise APIError('Invalid time format')
 
         if not isinstance(self.data['calories'], int) or self.data['calories'] <= 0:
-            abort(400, 'Invalid calories value')
+            raise APIError('Invalid calories value')
 
         meal_dt = parse_date('%s %s' % (self.data['date'], self.data['time']))
 
@@ -221,30 +359,47 @@ class Meals(Resource):
         return created_response('meal', account_id=self.account.id, meal_id=meal.id)
 
     def get(self, account_id):
-        meals = models.Meal.select().where(models.Meal.account == self.account)
+        meals = models.Meal.select().where(models.Meal.account == self.account).order_by(models.Meal.date.desc(), models.Meal.time.desc())
 
         if 'meal-date-from' in request.args:
-            meals = meals.where(models.Meal.meal_date)
+            if not utils.is_valid_date(request.args['meal-date-from']):
+                raise APIError('Invalid meal-date-from format')
 
-        return rest_serializers.serialize_meals(meals)
+            dt = parse_date(request.args['meal-date-from']).date()
+            meals = meals.where(models.Meal.date >= dt)
+
+        if 'meal-date-to' in request.args:
+            if not utils.is_valid_date(request.args['meal-date-to']):
+                raise APIError('Invalid meal-date-to format')
+
+            dt = parse_date(request.args['meal-date-to']).date()
+            meals = meals.where(models.Meal.date <= dt)
+
+        if 'meal-time-from' in request.args:
+            if not utils.is_valid_time(request.args['meal-time-from']):
+                raise APIError('Invalid meal-time-from format')
+
+            meals = meals.where(models.Meal.time >= request.args['meal-time-from'])
+
+        if 'meal-time-to' in request.args:
+            if not utils.is_valid_time(request.args['meal-time-to']):
+                raise APIError('Invalid meal-time-to format')
+
+            meals = meals.where(models.Meal.time <= request.args['meal-time-to'])
+
+        return self.return_paginated(meals, 'meals', {'account_id': account_id})
 
 
 @require_auth(roles=['user', 'admin'], accountid_free_roles=['admin'])
-class Meal(Resource):
-    __metaclass__ = ResourceMeta
-
-    def __init__(self):
-        self.meal = None
-        super(Meal, self).__init__()
-
+class Meal(DemoResource):
     def pre_execute(self, *args, **kwargs):
         try:
             self.meal = models.Meal.get(models.Meal.id == kwargs['meal_id'], models.Meal.account == self.account)
         except models.Meal.DoesNotExist:
-            abort(404, 'Meal not found')
+            raise APIError('Meal not found', 404)
 
     def get(self, account_id, meal_id):
-        return jsonify(rest_serializers.serialize_meal(self.meal))
+        return self.meal.serialize()
 
     def delete(self, account_id, meal_id):
         self.meal.delete_instance()
@@ -252,19 +407,19 @@ class Meal(Resource):
 
     def put(self, account_id, meal_id):
         if any(k for k in self.data if k not in ('id', 'account', 'date', 'time', 'description', 'calories')):
-            raise InvalidAPIUsage('Invalid parameters')
+            raise APIError('Invalid parameters')
 
         # skipping id and account fields
 
         if 'date' in self.data:
             if not utils.is_valid_date(self.data['date']):
-                raise InvalidAPIUsage('Invalid date')
+                raise APIError('Invalid date')
 
             self.meal.date = parse_date(self.data['date']).date()
 
         if 'time' in self.data:
             if not utils.is_valid_time(self.data['time']):
-                raise InvalidAPIUsage('Invalid time')
+                raise APIError('Invalid time')
 
             self.meal.time = self.data['time']
 
@@ -273,18 +428,18 @@ class Meal(Resource):
 
         if 'calories' in self.data:
             if not isinstance(self.data['calories'], int) or self.data['calories'] <= 0:
-                abort(400, 'Invalid calories value')
+                raise APIError('Invalid calories value')
 
             self.meal.calories = self.data['calories']
 
         self.meal.save()
-        return jsonify(rest_serializers.serialize_meal(self.meal))
+        return self.meal.serialize()
 
 
-@app.errorhandler(InvalidAPIUsage)
+@app.errorhandler(AppError)
 def handle_invalid_usage(error):
-    response = jsonify(error.to_dict())
-    response.status_code = error.status_code
+    response = jsonify(error.data)
+    response.status_code = error.code
     return response
 
 api.add_resource(Accounts, '/api/accounts', endpoint='accounts')
@@ -303,26 +458,26 @@ def public(path):
 def login():
     if any(f for f in ('grant_type', 'username', 'password') if f not in request.form) or \
             any(k for k in request.form if k not in ('grant_type', 'username', 'password')):
-        raise InvalidAPIUsage('invalid_request')
+        raise AppError('invalid_request')
 
     if request.form['grant_type'] != 'password':
         # only implementing Resource Owner Password Credentials Grant from RFC 6749
-        raise InvalidAPIUsage('unsupported_grant_type')
+        raise AppError('unsupported_grant_type')
 
     try:
-        account = models.Account.get(email=request.form['username'])
+        account = models.get_active_account(email=request.form['username'])
     except models.Account.DoesNotExist:
-        raise InvalidAPIUsage('invalid_grant')
+        raise AppError('invalid_grant')
 
     if not check_password_hash(account.password, request.form['password']):
-        raise InvalidAPIUsage('invalid_grant')
+        raise AppError('invalid_grant')
 
     if not account.active:
         update_token = utils.urlserializer.dumps({'id': account.id, 'active': True}, salt='account-update')
         url = url_for('public', path='apply-account-changes', account_id=account.id, token=update_token,
                       _external=True)
-        tasks.send_activation_email.delay(account.id, url)
-        raise InvalidAPIUsage('invalid_grant', error_description='Your account is not active. An email has been sent '
+        tasks.send_activation_email.delay(account.id, url, update_token)
+        raise AppError('invalid_grant', error_description='Your account is not active. An email has been sent '
                                                                  'to you with instructions to activate your account.')
 
     roles = map(lambda x: x.code, models.Role.select().join(models.AccountRole).where(models.AccountRole.account == account))
