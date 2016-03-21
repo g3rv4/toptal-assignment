@@ -1,8 +1,8 @@
 (function (define) {
     define(
-        ['angular'],
-        function (angular) {
-            var UsersController = function (ModelService, RolesService, $uibModal, $state, $rootScope) {
+        ['angular', 'lodash'],
+        function (angular, _) {
+            var UsersController = function (ModelService, RolesService, $uibModal, $state, $rootScope, $timeout) {
                 var _this = this;
                 var User = ModelService['Account'];
 
@@ -23,14 +23,23 @@
                 var updateEditingUser = function(user_id){
                     _this.showMeals = 0;
                     _this.editFormSent = false;
+                    _this.editingRoles = {};
                     User.get({id: user_id}, function(user){
                         _this.editingUser = user;
+                        _this.editingRoles = {
+                            'user': user.roles.indexOf('user') != -1,
+                            'userManager': user.roles.indexOf('user-manager') != -1,
+                            'admin': user.roles.indexOf('admin') != -1
+                        }
                     });
                 };
 
                 $rootScope.$on('$stateChangeSuccess', function(event, toState, toParams){
                     if(toState.name == 'controlpanel.users'){
                         _this.editingUser = null;
+                        $timeout(function(){
+                            _this.refreshData();
+                        }, 500);
                     } else if(toState.name == 'controlpanel.users.edit'){
                         updateEditingUser(toParams.user_id);
                     }
@@ -121,7 +130,16 @@
                     _this.editFormSent = true;
 
                     if(_this.formEditElement.$valid){
-                        _this.editingUser.$update();
+                        _this.editingUser.roles = [];
+                        _.forOwn(_this.editingRoles, function(v, k){
+                            if(v){
+                                k = k == 'userManager' ? 'user-manager' : k;
+                                _this.editingUser.roles.push(k);
+                            }
+                        });
+                        _this.editingUser.$update(function(){
+                            $state.go('controlpanel.users');
+                        });
                     }
                 };
 
@@ -158,7 +176,7 @@
                 _this.refreshData();
             };
 
-            return ['ModelService', 'RolesService', '$uibModal', '$state', '$rootScope', UsersController];
+            return ['ModelService', 'RolesService', '$uibModal', '$state', '$rootScope', '$timeout', UsersController];
         }
     );
 }(define));

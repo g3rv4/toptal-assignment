@@ -127,8 +127,8 @@
             <div class="panel-heading">
                 <h3 class="panel-title">Editing account: {{ctrl.editingUser.name}}</h3>
             </div>
-            <div class="panel-body">
-                <form novalidate name="ctrl.formEditElement" ng-submit="ctrl.editUser()">
+            <form novalidate name="ctrl.formEditElement" ng-submit="ctrl.editUser()">
+                <div class="panel-body">
                     <div class="row">
                         <div class="col-lg-3 form-group"
                              ng-class="ctrl.editFormSent && !ctrl.formEditElement.editUserName.$valid ? 'has-error' : ''">
@@ -155,27 +155,32 @@
                                    id="editUserPassword2" name="editUserPassword2" minlength="8"/>
                         </div>
                     </div>
-                    <div class="row">
+                    <div class="row" ng-if="ctrl.userHasRole('admin')">
                         <div class="col-lg-12">
-                            <div class="btn-toolbar">
-                                <button type="submit" class="btn btn-success">Save Changes</button>
-                                <a ui-sref="controlpanel.users" class="btn btn-default">Back to users list</a>
+                            <div class="btn-group text-center" ng-model="ctrl.editingRoles" bs-checkbox-group>
+                                <label class="btn btn-default"><input type="checkbox" value="user"> User</label>
+                                <label class="btn btn-default"><input type="checkbox" value="userManager"> User Manager</label>
+                                <label class="btn btn-default"><input type="checkbox" value="admin"> Admin</label>
                             </div>
                         </div>
                     </div>
-                </form>
-            </div>
+                </div>
+                <div class="panel-footer">
+                    <div class="btn-toolbar">
+                        <button type="submit" class="btn btn-success">Save Changes</button>
+                        <a ui-sref="controlpanel.users" class="btn btn-default">Back to users list</a>
+                    </div>
+                </div>
+            </form>
         </div>
         <div ng-if="ctrl.userHasRole('admin') && ctrl.editingUser.roles.indexOf('user') != -1">
             <div class="text-center">
                 <div class="btn-group text-center" ng-model="ctrl.showMeals" bs-radio-group>
-                    <label class="btn btn-default" ng-class="ctrl.showMeals ? 'active' : ''"><input type="radio"
-                                                                                                    class="btn btn-default"
-                                                                                                    value="1"> View
+                    <label class="btn btn-default" ng-class="ctrl.showMeals ? 'active' : ''">
+                        <input type="radio" class="btn btn-default" value="1"> View
                         Meals</label>
-                    <label class="btn btn-default" ng-class="ctrl.showMeals ? '' : 'active'"><input type="radio"
-                                                                                                    class="btn btn-default"
-                                                                                                    value="0"> Hide
+                    <label class="btn btn-default" ng-class="ctrl.showMeals ? '' : 'active'">
+                        <input type="radio" class="btn btn-default" value="0"> Hide
                         Meals</label>
                 </div>
             </div>
