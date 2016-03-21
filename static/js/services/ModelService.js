@@ -26,6 +26,19 @@
                             headers()['count'] = data.pagination.total_items;
                             return data.data;
                         }
+                    },
+                    get: {
+                        transformResponse: function (data, headers, status_code) {
+                            if(status_code.toString().charAt(0) != 2){
+                                try{
+                                    data = JSON.parse(data)
+                                } catch(e) { }
+                                return data;
+                            }
+                            var data = JSON.parse(data);
+                            data.id = parseInt(_.last(_.split(data.id, '/')));
+                            return data;
+                        }
                     }
                 });
             };

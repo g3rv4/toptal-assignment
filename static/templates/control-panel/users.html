@@ -1,0 +1,187 @@
+<div class="row top-buffer">
+    <div class="col-lg-12" ng-hide="ctrl.editingUser">
+        <uib-accordion close-others="false">
+            <uib-accordion-group heading="Add User" is-open="ctrl.addUserVisible">
+                <uib-alert ng-repeat="alert in ctrl.addUserAlerts" type="{{alert.type || 'danger'}}"
+                           close="ctrl.addUserAlerts.splice($index, 1)" dismiss-on-timeout="5000">{{alert.message}}
+                </uib-alert>
+                <form novalidate ng-submit="ctrl.addUser();" name="ctrl.formElement">
+                    <div class="row">
+                        <div class="col-lg-3 form-group"
+                             ng-class="ctrl.userFormSent && !ctrl.formElement.newUserName.$valid ? 'has-error' : ''">
+                            <label class="control-label" for="newUserName">Name</label>
+                            <input type="text" ng-model="ctrl.newUser.name" class="form-control"
+                                   id="newUserName" name="newUserName" minlength="3" required/>
+                        </div>
+                        <div class="col-lg-3 form-group"
+                             ng-class="ctrl.userFormSent && !ctrl.formElement.newUserEmail.$valid ? 'has-error' : ''">
+                            <label class="control-label" for="newUserEmail">Email</label>
+                            <input type="email" ng-model="ctrl.newUser.email" class="form-control"
+                                   id="newUserEmail" name="newUserEmail" min="0" required/>
+                        </div>
+                        <div class="col-lg-3 form-group"
+                             ng-class="ctrl.userFormSent && !ctrl.formElement.newUserPassword.$valid ? 'has-error' : ''">
+                            <label class="control-label" for="newUserPassword">Password</label>
+                            <input type="password" ng-model="ctrl.newUser.password" class="form-control"
+                                   id="newUserPassword" name="newUserPassword" minlength="8" required/>
+                        </div>
+                        <div class="col-lg-3 form-group"
+                             ng-class="ctrl.userFormSent && (!ctrl.formElement.newUserPassword2.$valid || ctrl.newUser.password != ctrl.newUser.password2) ? 'has-error' : ''">
+                            <label class="control-label" for="newUserPassword2">Repeat Password</label>
+                            <input type="password" ng-model="ctrl.newUser.password2" class="form-control"
+                                   id="newUserPassword2" name="newUserPassword2" minlength="8" required/>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-lg-12">
+                            <div class="btn-toolbar">
+                                <button type="submit" class="btn btn-success">Create User</button>
+                                <button type="button" class="btn btn-default" ng-click="ctrl.resetQuery();">Reset
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </uib-accordion-group>
+            <uib-accordion-group heading="Filter Users" is-open="ctrl.filtersVisible">
+                <form novalidate ng-submit="ctrl.doFilter();">
+                    <div class="row">
+                        <div class="col-lg-6 form-group">
+                            <label>Name</label>
+                            <input type="text" ng-model="ctrl.query.name" class="form-control"/>
+                        </div>
+                        <div class="col-lg-6 form-group">
+                            <label>Email</label>
+                            <input type="text" ng-model="ctrl.query.email" class="form-control"/>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-lg-12">
+                            <div class="btn-toolbar">
+                                <button type="submit" class="btn btn-primary">Apply filter</button>
+                                <button type="button" class="btn btn-default" ng-click="ctrl.resetQuery();">Reset
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </uib-accordion-group>
+            <uib-accordion-group heading="Users List" is-open="true">
+                <uib-alert ng-repeat="alert in ctrl.usersAlerts" type="{{alert.type || 'danger'}}"
+                           close="ctrl.usersAlerts.splice($index, 1)" dismiss-on-timeout="5000">{{alert.message}}
+                </uib-alert>
+                <div class="table-responsive">
+                    <table class="table table-striped table-bordered table-hover">
+                        <thead>
+                        <tr>
+                            <th>Id</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Roles</th>
+                            <th>Actions</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr ng-repeat="item in ctrl.elements">
+                            <td>{{item.id}}</td>
+                            <td>{{item.name}}</td>
+                            <td>{{item.email}}</td>
+                            <td>{{ctrl.printableRoles(item.roles)}}</td>
+                            <td>
+                                <a ui-sref="controlpanel.users.edit({user_id: item.id})" class="btn btn-primary btn-xs"
+                                   href>Edit</a>
+                                <button type="button" class="btn btn-danger btn-xs" ng-click="ctrl.deleteUser(item)">
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="row" ng-if="ctrl.totalItems > 5">
+                    <div class="col-lg-12 text-center">
+                        Showing <span uib-dropdown on-toggle="toggled(open)">
+      <a href id="simple-dropdown" uib-dropdown-toggle>
+          {{ctrl.query['items-per-page']}}
+      </a>
+      <ul uib-dropdown-menu aria-labelledby="simple-dropdown" class="remove-min-width">
+          <li ng-repeat="choice in [5, 10, 25, 50, 100]">
+              <a href ng-click="ctrl.setItemsPerPage(choice)">{{choice}}</a>
+          </li>
+      </ul>
+    </span> users per page
+                    </div>
+                </div>
+                <div class="row text-center" ng-if="ctrl.totalItems > ctrl.query['items-per-page']">
+                    <uib-pagination boundary-links="true" total-items="ctrl.totalItems" ng-model="ctrl.query.page"
+                                    items-per-page="ctrl.query['items-per-page']"
+                                    class="pagination-sm" previous-text="&lsaquo;" next-text="&rsaquo;"
+                                    ng-change="ctrl.refreshData()"
+                                    first-text="First" last-text="Last"></uib-pagination>
+                </div>
+            </uib-accordion-group>
+        </uib-accordion>
+    </div>
+    <div class="col-lg-12" ng-show="ctrl.editingUser">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h3 class="panel-title">Editing account: {{ctrl.editingUser.name}}</h3>
+            </div>
+            <div class="panel-body">
+                <form novalidate name="ctrl.formEditElement" ng-submit="ctrl.editUser()">
+                    <div class="row">
+                        <div class="col-lg-3 form-group"
+                             ng-class="ctrl.editFormSent && !ctrl.formEditElement.editUserName.$valid ? 'has-error' : ''">
+                            <label class="control-label" for="editUserName">Name</label>
+                            <input type="text" ng-model="ctrl.editingUser.name" class="form-control"
+                                   id="editUserName" name="editUserName" minlength="3" required/>
+                        </div>
+                        <div class="col-lg-3 form-group"
+                             ng-class="ctrl.editFormSent && !ctrl.formEditElement.editUserEmail.$valid ? 'has-error' : ''">
+                            <label class="control-label" for="editUserEmail">Email</label>
+                            <input type="email" ng-model="ctrl.editingUser.email" class="form-control"
+                                   id="editUserEmail" name="editUserEmail" min="0" required/>
+                        </div>
+                        <div class="col-lg-3 form-group"
+                             ng-class="ctrl.editFormSent && !ctrl.formEditElement.editUserPassword.$valid ? 'has-error' : ''">
+                            <label class="control-label" for="editUserPassword">Password</label>
+                            <input type="password" ng-model="ctrl.editingUser.password" class="form-control"
+                                   id="editUserPassword" name="editUserPassword" minlength="8"/>
+                        </div>
+                        <div class="col-lg-3 form-group"
+                             ng-class="ctrl.editFormSent && (!ctrl.formEditElement.editUserPassword2.$valid || ctrl.editingUser.password != ctrl.editingUser.password2) ? 'has-error' : ''">
+                            <label class="control-label" for="editUserPassword2">Repeat Password</label>
+                            <input type="password" ng-model="ctrl.editingUser.password2" class="form-control"
+                                   id="editUserPassword2" name="editUserPassword2" minlength="8"/>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-lg-12">
+                            <div class="btn-toolbar">
+                                <button type="submit" class="btn btn-success">Save Changes</button>
+                                <a ui-sref="controlpanel.users" class="btn btn-default">Back to users list</a>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div ng-if="ctrl.userHasRole('admin') && ctrl.editingUser.roles.indexOf('user') != -1">
+            <div class="text-center">
+                <div class="btn-group text-center" ng-model="ctrl.showMeals" bs-radio-group>
+                    <label class="btn btn-default" ng-class="ctrl.showMeals ? 'active' : ''"><input type="radio"
+                                                                                                    class="btn btn-default"
+                                                                                                    value="1"> View
+                        Meals</label>
+                    <label class="btn btn-default" ng-class="ctrl.showMeals ? '' : 'active'"><input type="radio"
+                                                                                                    class="btn btn-default"
+                                                                                                    value="0"> Hide
+                        Meals</label>
+                </div>
+            </div>
+            <div ng-show="ctrl.showMeals">
+                <div ui-view="meals"></div>
+            </div>
+        </div>
+    </div>
+</div>

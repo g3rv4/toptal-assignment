@@ -9,6 +9,10 @@
                         controller: 'BaseCtrl as ctrl',
                         templateUrl: '/static/templates/control-panel/base.html'
                     })
+                    .state('controlpanel.index', {
+                        url: '/',
+                        template: ''
+                    })
                     .state('controlpanel.meals', {
                         url: '/meals',
                         controller: 'MealsCtrl as ctrl',
@@ -21,12 +25,20 @@
                     })
                     .state('controlpanel.users', {
                         url: '/users',
-                        controller: 'SettingsCtrl as ctrl',
-                        templateUrl: '/static/templates/control-panel/settings.html'
+                        controller: 'UsersCtrl as ctrl',
+                        templateUrl: '/static/templates/control-panel/users.html'
+                    })
+                    .state('controlpanel.users.edit', {
+                        url: '/:user_id',
+                        views: {
+                            meals: {
+                                controller: 'MealsCtrl as ctrl',
+                                templateUrl: '/static/templates/control-panel/meals.html'
+                            }
+                        }
                     });
 
-                $urlRouterProvider.when('', '/meals');
-                $urlRouterProvider.otherwise('/meals');
+                $urlRouterProvider.otherwise('/');
             };
             return ['$stateProvider', '$urlRouterProvider', ControlPanelRouter];
         }

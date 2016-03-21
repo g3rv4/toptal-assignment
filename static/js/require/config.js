@@ -11,6 +11,7 @@ requirejs.config({
         "ng-resource": "../components/angular-resource/angular-resource",
         "ng-bootstrap": "../components/angular-bootstrap/ui-bootstrap-tpls",
         "ng-animate": '../components/angular-animate/angular-animate',
+        "ng-strap": '../components/angular-strap/dist/angular-strap',
         "moment": "../components/moment/moment"
     },
     "shim": {
@@ -23,6 +24,7 @@ requirejs.config({
         "ng-resource": ['angular'],
         "ng-bootstrap": ['angular'],
         "ng-animate": ['angular'],
+        "ng-strap": ['angular'],
         "moment": {
             exports: 'moment'
         }

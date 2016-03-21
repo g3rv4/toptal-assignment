@@ -2,9 +2,9 @@
     define(
         ['angular', 'moment'],
         function (angular, moment) {
-            var MealsController = function (ModelService, $uibModal) {
+            var MealsController = function (ModelService, $uibModal, $stateParams) {
                 var _this = this;
-                var Meal = ModelService['Meal'](0);
+                var Meal = ModelService['Meal']($stateParams.user_id || 0);
 
                 _this.datepickerOptions = {
                     showWeeks: false,
@@ -127,10 +127,10 @@
                 _this.deleteMeal = function(meal){
                     var modal = $uibModal.open({
                         templateUrl: '/static/templates/control-panel/modal/delete-meal.html',
-                        controller: 'DeleteMealCtrl',
+                        controller: 'DeleteItemCtrl',
                         controllerAs: 'ctrl',
                         resolve: {
-                            meal: function(){
+                            item: function(){
                                 return meal;
                             }
                         }
@@ -157,7 +157,7 @@
                 _this.refreshData();
             };
 
-            return ['ModelService', '$uibModal', MealsController];
+            return ['ModelService', '$uibModal', '$stateParams', MealsController];
         }
     );
 }(define));

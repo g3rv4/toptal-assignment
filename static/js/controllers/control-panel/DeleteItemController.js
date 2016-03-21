@@ -2,9 +2,9 @@
     define(
         [],
         function () {
-            var DeleteMealController = function ($uibModalInstance, meal) {
+            var DeleteItemController = function ($uibModalInstance, item) {
                 var _this = this;
-                _this.meal = meal;
+                _this.item = item;
 
                 _this.ok = function(){
                     $uibModalInstance.close();
@@ -15,7 +15,7 @@
                 };
             };
 
-            return ['$uibModalInstance', 'meal', DeleteMealController];
+            return ['$uibModalInstance', 'item', DeleteItemController];
         }
     );
 }(define));

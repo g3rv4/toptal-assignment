@@ -5,7 +5,8 @@
             'controllers/control-panel/BaseController',
             'controllers/control-panel/MealsController',
             'controllers/control-panel/EditMealController',
-            'controllers/control-panel/DeleteMealController',
+            'controllers/control-panel/DeleteItemController',
+            'controllers/control-panel/UsersController',
             'services/ModelService',
             'services/RolesService',
             'routers/ControlPanelRouter',
@@ -13,16 +14,20 @@
             'ng-resource',
             'ng-local-storage',
             'ng-bootstrap',
-            'ng-animate'
+            'ng-animate',
+            'ng-strap'
         ],
-        function (ng, BaseCtrl, MealsCtrl, EditMealCtrl, DeleteMealCtrl, ModelService, RolesService, ControlPanelRouter) {
+        function (ng, BaseCtrl, MealsCtrl, EditMealCtrl, DeleteItemCtrl, UsersCtrl, ModelService, RolesService,
+                  ControlPanelRouter) {
             var moduleName = 'Demo.ControlPanelModule';
 
-            ng.module(moduleName, ['ui.router', 'ngResource', 'LocalStorageModule', 'ui.bootstrap', 'ngAnimate'])
+            ng.module(moduleName, ['ui.router', 'ngResource', 'LocalStorageModule', 'ui.bootstrap', 'ngAnimate',
+                'mgcrea.ngStrap'])
                 .controller('BaseCtrl', BaseCtrl)
                 .controller('MealsCtrl', MealsCtrl)
                 .controller('EditMealCtrl', EditMealCtrl)
-                .controller('DeleteMealCtrl', DeleteMealCtrl)
+                .controller('DeleteItemCtrl', DeleteItemCtrl)
+                .controller('UsersCtrl', UsersCtrl)
                 .factory('ModelService', ModelService)
                 .factory('RolesService', RolesService)
                 .config(ControlPanelRouter)

@@ -183,13 +183,13 @@ class DemoResource(Resource):
 class Accounts(DemoResource):
     @require_auth(roles=['user-manager', 'admin'])
     def get(self):
-        accounts = models.Account.select().where(models.Account.deleted==False).order_by(models.Account.name)
+        accounts = models.Account.select().where(models.Account.deleted==False).order_by(models.Account.name, models.Account.email)
 
         if 'name' in request.args:
-            accounts = accounts.where(models.Account.name % ('%%%s%%' % request.args['name']))
+            accounts = accounts.where(models.Account.name ** ('%%%s%%' % request.args['name']))
 
         if 'email' in request.args:
-            accounts = accounts.where(models.Account.email % ('%%%s%%' % request.args['email']))
+            accounts = accounts.where(models.Account.email ** ('%%%s%%' % request.args['email']))
 
         return self.return_paginated(accounts, 'accounts', {})
 
@@ -265,10 +265,7 @@ class Account(DemoResource):
             return self.update_account(account_id)
 
         # verify authorization
-        if 'roles' in self.data:
-            account_id, token = verify_token_get_account(['admin'], ['admin'], kwargs={'account_id': account_id})
-        else:
-            account_id, token = verify_token_get_account(['user', 'user-manager', 'admin'], ['user-manager', 'admin'], kwargs={'account_id': account_id})
+        account_id, token = verify_token_get_account(['user', 'user-manager', 'admin'], ['user-manager', 'admin'], kwargs={'account_id': account_id})
 
         try:
             account = models.get_active_account(id=account_id)
@@ -286,6 +283,10 @@ class Account(DemoResource):
 
             current_roles = models.Role.select().join(models.AccountRole).where(models.AccountRole.account == account)
 
+            # changing roles is something only an admin can do
+            if any(r for r in current_roles if r not in final_roles) or any(r for r in final_roles if r not in current_roles):
+                verify_token_get_account(['admin'], ['admin'], kwargs={'account_id': account_id})
+
             # handle deletions
             for role in [r for r in current_roles if r not in final_roles]:
                 models.AccountRole.get(models.AccountRole.account == account, models.AccountRole.role == role).delete_instance()
@@ -300,7 +301,7 @@ class Account(DemoResource):
 
             account.name = self.data['name']
 
-        if 'email' in self.data:
+        if 'email' in self.data and self.data['email'] != account.email:
             if not utils.is_valid_email(self.data['email']):
                 raise APIError('Invalid email')
 
@@ -316,11 +317,12 @@ class Account(DemoResource):
             if len(self.data['password']) < 8:
                 raise APIError('Invalid password')
 
-            if 'current_password' not in self.data:
-                raise APIError('Missing current_password')
+            if not any(r for r in current_roles if r in ('user-manager', 'admin')):
+                if 'current_password' not in self.data:
+                    raise APIError('Missing current_password')
 
-            if not check_password_hash(account.password, self.data['current_password']):
-                raise APIError('Invalid current_password')
+                if not check_password_hash(account.password, self.data['current_password']):
+                    raise APIError('Invalid current_password')
 
             account.password = generate_password_hash(self.data['password'])
 

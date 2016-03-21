@@ -33,7 +33,7 @@
         <div class="sidebar-nav navbar-collapse">
             <ul class="nav in" id="side-menu">
                 <li>
-                    <a ui-sref="controlpanel.meals" ui-sref-active="active"><i class="fa fa-cutlery fa-fw"></i>
+                    <a ng-if="ctrl.userHasRole('user')" ui-sref="controlpanel.meals" ui-sref-active="active"><i class="fa fa-cutlery fa-fw"></i>
                         Meals</a>
                 </li>
                 <li ng-if="ctrl.userHasRole('admin') || ctrl.userHasRole('user-manager')" class="ng-cloak">
