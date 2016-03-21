@@ -1,6 +1,6 @@
 (function(define) {
     define(
-        ['angular', 'modules/ControlPanelModule', 'sb-admin'],
+        ['angular', 'modules/ControlPanelModule'],
         function (ng, ControlPanelModule) {
             var app, appName = 'Demo';
 

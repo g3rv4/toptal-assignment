@@ -1,0 +1,13 @@
+<div class="modal-header">
+    <h3 class="modal-title">Confirm meal deletion</h3>
+</div>
+<div class="modal-body">
+    <div>
+        You are about to delete the "{{ctrl.meal.description}}" meal from {{ctrl.meal.date}} at {{ctrl.meal.time}}.
+    </div>
+    <div class="top-buffer"><strong>Are you sure?</strong></div>
+</div>
+<div class="modal-footer">
+    <button class="btn btn-danger" type="button" ng-click="ctrl.ok()">Yes</button>
+    <button class="btn btn-default" type="button" ng-click="ctrl.cancel()">No</button>
+</div>

@@ -4,19 +4,25 @@
             'angular',
             'controllers/control-panel/BaseController',
             'controllers/control-panel/MealsController',
+            'controllers/control-panel/EditMealController',
+            'controllers/control-panel/DeleteMealController',
             'services/ModelService',
             'services/RolesService',
             'routers/ControlPanelRouter',
             'ng-ui-router',
             'ng-resource',
-            'ng-local-storage'
+            'ng-local-storage',
+            'ng-bootstrap',
+            'ng-animate'
         ],
-        function (ng, BaseCtrl, MealsCtrl, ModelService, RolesService, ControlPanelRouter) {
+        function (ng, BaseCtrl, MealsCtrl, EditMealCtrl, DeleteMealCtrl, ModelService, RolesService, ControlPanelRouter) {
             var moduleName = 'Demo.ControlPanelModule';
 
-            ng.module(moduleName, ['ui.router', 'ngResource', 'LocalStorageModule'])
+            ng.module(moduleName, ['ui.router', 'ngResource', 'LocalStorageModule', 'ui.bootstrap', 'ngAnimate'])
                 .controller('BaseCtrl', BaseCtrl)
                 .controller('MealsCtrl', MealsCtrl)
+                .controller('EditMealCtrl', EditMealCtrl)
+                .controller('DeleteMealCtrl', DeleteMealCtrl)
                 .factory('ModelService', ModelService)
                 .factory('RolesService', RolesService)
                 .config(ControlPanelRouter)

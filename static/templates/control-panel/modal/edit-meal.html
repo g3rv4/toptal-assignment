@@ -1,0 +1,50 @@
+<div class="modal-header">
+    <h3 class="modal-title">Edit meal</h3>
+</div>
+<form novalidate ng-submit="ctrl.submit()" name="ctrl.formElement">
+    <div class="modal-body">
+        <uib-alert ng-if="ctrl.error" type="danger" close="ctrl.error = null;" dismiss-on-timeout="5000">{{ctrl.error}}</uib-alert>
+        <div class="row">
+            <div class="col-lg-6 form-group"
+                 ng-class="!ctrl.formElement.date.$valid ? 'has-error' : ''">
+                <label class="control-label">Date</label>
+                <p class="input-group">
+                    <input type="text" class="form-control" uib-datepicker-popup="M/d/yy"
+                           ng-model="ctrl.mealForm.date"
+                           name="date"
+                           datepicker-options="ctrl.datepickerOptions"
+                           is-open="ctrl.datepickerOpen"
+                           close-text="Close" onkeydown="return false;"
+                           ng-focus="ctrl.datepickerOpen = true;" required/>
+          <span class="input-group-btn">
+            <button type="button" class="btn btn-default" ng-click="ctrl.datepickerOpen = true;"><i
+                    class="fa fa-calendar"></i></button>
+          </span>
+                </p>
+            </div>
+            <div class="col-lg-6 form-group"
+                 ng-class="!ctrl.formElement.time.$valid ? 'has-error' : ''">
+                <label class="control-label" for="time">Time</label>
+                <input type="time" ng-model="ctrl.mealForm.time" class="form-control" name="time" id="time" required/>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-lg-6 form-group"
+                 ng-class="!ctrl.formElement.description.$valid ? 'has-error' : ''">
+                <label class="control-label" for="description">Description</label>
+                <input type="text" ng-model="ctrl.meal.description" class="form-control"
+                       name="description" id="description" required/>
+            </div>
+            <div class="col-lg-6 form-group"
+                 ng-class="!ctrl.formElement.calories.$valid ? 'has-error' : ''">
+                <label class="control-label" for="calories">Calories</label>
+                <input type="number" ng-model="ctrl.meal.calories" class="form-control"
+                       id="calories" name="calories" min="0" required/>
+            </div>
+        </div>
+    </div>
+    <div class="modal-footer">
+        <button class="btn btn-success" type="submit" ng-disabled="ctrl.formElement.$invalid">Save</button>
+        <button class="btn btn-default" type="button" ng-click="ctrl.cancel()">Cancel</button>
+    </div>
+</form>

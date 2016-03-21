@@ -6,7 +6,9 @@
                 return {
                     userHasRole: function(requiredRole){
                         var userRoles = localStorageService.get('roles');
-                        return userRoles.indexOf(requiredRole) != -1;
+                        if(userRoles)
+                            return userRoles.indexOf(requiredRole) != -1;
+                        return false;
                     }
                 }
             };
