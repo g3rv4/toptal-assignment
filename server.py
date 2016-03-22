@@ -208,7 +208,8 @@ class Accounts(DemoResource):
             raise APIError('Email already registered')
         except models.Account.DoesNotExist:
             account = models.Account(name=self.data['name'], email=self.data['email'],
-                                     password=generate_password_hash(self.data['password']))
+                                     password=generate_password_hash(self.data['password']),
+                                     calories_goal=settings['default_calories_goal'])
             account.save()
 
             # make this account a user
@@ -250,6 +251,13 @@ class Account(DemoResource):
             account = models.get_active_account(id=account_id)
         except models.Account.DoesNotExist:
             raise APIError('Account does not exist', 404)
+
+        if 'email' in update_data:
+            try:
+                models.get_active_account(email=update_data['email'])
+                raise APIError('Your email address is already being used, no changes has been applied to your account')
+            except:
+                pass
 
         del update_data['id']
         for k in update_data:
@@ -305,8 +313,18 @@ class Account(DemoResource):
             if not utils.is_valid_email(self.data['email']):
                 raise APIError('Invalid email')
 
-            if models.get_active_account(email=self.data['email']):
+            try:
+                models.get_active_account(email=self.data['email'])
                 raise APIError('Email already used')
+            except models.Account.DoesNotExist:
+                pass
+
+            if not any(r for r in token['roles'] if r in ('user-manager', 'admin')):
+                if 'current_password' not in self.data:
+                    raise APIError('Missing current password')
+
+                if not check_password_hash(account.password, self.data['current_password']):
+                    raise APIError('Invalid current password')
 
             update_token = utils.urlserializer.dumps({'id': account.id, 'email': self.data['email']}, salt='account-update')
             url = url_for('public', path='apply-account-changes', account_id=account.id, token=update_token,
@@ -319,12 +337,18 @@ class Account(DemoResource):
 
             if not any(r for r in token['roles'] if r in ('user-manager', 'admin')):
                 if 'current_password' not in self.data:
-                    raise APIError('Missing current_password')
+                    raise APIError('Missing current password')
 
                 if not check_password_hash(account.password, self.data['current_password']):
-                    raise APIError('Invalid current_password')
+                    raise APIError('Invalid current password')
 
             account.password = generate_password_hash(self.data['password'])
+
+        if 'calories_goal' in self.data:
+            try:
+                account.calories_goal = int(self.data['calories_goal'])
+            except:
+                raise APIError('Invalid calories amount')
 
         account.save()
         return '', 204

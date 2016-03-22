@@ -7,6 +7,9 @@
             'controllers/control-panel/EditMealController',
             'controllers/control-panel/DeleteItemController',
             'controllers/control-panel/UsersController',
+            'controllers/control-panel/SettingsController',
+            'directives/EqualsDirective',
+            'directives/AddHasErrorClass',
             'services/ModelService',
             'services/RolesService',
             'routers/ControlPanelRouter',
@@ -17,8 +20,8 @@
             'ng-animate',
             'ng-strap'
         ],
-        function (ng, BaseCtrl, MealsCtrl, EditMealCtrl, DeleteItemCtrl, UsersCtrl, ModelService, RolesService,
-                  ControlPanelRouter) {
+        function (ng, BaseCtrl, MealsCtrl, EditMealCtrl, DeleteItemCtrl, UsersCtrl, SettingsCtrl, EqualsDirective,
+                  AddHasErrorClass, ModelService, RolesService, ControlPanelRouter) {
             var moduleName = 'Demo.ControlPanelModule';
 
             ng.module(moduleName, ['ui.router', 'ngResource', 'LocalStorageModule', 'ui.bootstrap', 'ngAnimate',
@@ -28,6 +31,9 @@
                 .controller('EditMealCtrl', EditMealCtrl)
                 .controller('DeleteItemCtrl', DeleteItemCtrl)
                 .controller('UsersCtrl', UsersCtrl)
+                .controller('SettingsCtrl', SettingsCtrl)
+                .directive('equals', EqualsDirective)
+                .directive('addHasError', AddHasErrorClass)
                 .factory('ModelService', ModelService)
                 .factory('RolesService', RolesService)
                 .config(ControlPanelRouter)

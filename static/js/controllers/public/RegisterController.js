@@ -9,7 +9,7 @@
                 _this.submit = function(){
                     _this.form.sent = true;
 
-                    if(_this.formElement.$valid && _this.form.password == _this.form.password2) {
+                    if(_this.formElement.$valid) {
                         var Account = ModelService['Account'];
                         var reg = new Account({
                             name: _this.form.name,

@@ -17,6 +17,7 @@ class Account(DemoModel):
     name = CharField()
     email = CharField()
     password = CharField()
+    calories_goal = IntegerField()
     active = BooleanField(default=False)
     deleted = BooleanField(default=False)
     created_dt = DateTimeField(default=datetime.datetime.now)
