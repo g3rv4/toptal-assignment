@@ -30,7 +30,7 @@
                             'user': user.roles.indexOf('user') != -1,
                             'userManager': user.roles.indexOf('user-manager') != -1,
                             'admin': user.roles.indexOf('admin') != -1
-                        }
+                        };
                     });
                 };
 
@@ -138,7 +138,22 @@
                             }
                         });
                         _this.editingUser.$update(function(){
+                            _this.usersAlerts.push({
+                                type: 'success',
+                                message: 'User ' + _this.editingUser.id + ' updated successfully'
+                            });
                             $state.go('controlpanel.users');
+                        }, function(response){
+                            if(response.data.error){
+                                _this.usersAlerts.push({
+                                    message: response.data.error
+                                });
+                            } else {
+                                _this.usersAlerts.push({
+                                    message: 'Unexpected error ' + response.status
+                                });
+                            }
+                            _this.success = false;
                         });
                     }
                 };
@@ -157,6 +172,10 @@
 
                     modal.result.then(function(){
                         user.$delete(function(){
+                            _this.usersAlerts.push({
+                                type: 'success',
+                                message: 'User ' + user.id + ' deleted successfully'
+                            });
                             _this.refreshData();
                         }, function(response){
                             if(response.data.error){

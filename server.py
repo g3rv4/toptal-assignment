@@ -317,7 +317,7 @@ class Account(DemoResource):
             if len(self.data['password']) < 8:
                 raise APIError('Invalid password')
 
-            if not any(r for r in current_roles if r in ('user-manager', 'admin')):
+            if not any(r for r in token['roles'] if r in ('user-manager', 'admin')):
                 if 'current_password' not in self.data:
                     raise APIError('Missing current_password')
 

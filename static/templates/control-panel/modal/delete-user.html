@@ -1,9 +1,9 @@
 <div class="modal-header">
-    <h3 class="modal-title">Confirm meal deletion</h3>
+    <h3 class="modal-title">Confirm user deletion</h3>
 </div>
 <div class="modal-body">
     <div>
-        {{ctrl.item || json}}
+        You are about to delete the user {{ctrl.item.id}}, <strong>{{ctrl.item.name}}</strong> (with email {{ctrl.item.email}})
     </div>
     <div class="top-buffer"><strong>Are you sure?</strong></div>
 </div>
