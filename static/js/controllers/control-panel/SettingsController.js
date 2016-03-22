@@ -60,6 +60,7 @@
                             'meal-date-to': moment(_this.caloriesDay).format('YYYY-MM-DD')
                         }, function (meals) {
                             _this.calories = _.sumBy(meals, function(m){ return m.calories; });
+                            _this.caloriesDayStr = moment(_this.caloriesDay).format('M/D');
                         });
                     }
                 };

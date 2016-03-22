@@ -319,17 +319,20 @@ class Account(DemoResource):
             except models.Account.DoesNotExist:
                 pass
 
-            if not any(r for r in token['roles'] if r in ('user-manager', 'admin')):
+            if any(r for r in token['roles'] if r in ('user-manager', 'admin')):
+                account.email = self.data['email']
+            else:
+                # verify the current password and send a link to update the email
                 if 'current_password' not in self.data:
                     raise APIError('Missing current password')
 
                 if not check_password_hash(account.password, self.data['current_password']):
                     raise APIError('Invalid current password')
 
-            update_token = utils.urlserializer.dumps({'id': account.id, 'email': self.data['email']}, salt='account-update')
-            url = url_for('public', path='apply-account-changes', account_id=account.id, token=update_token,
-                          _external=True)
-            tasks.send_account_update_email.delay(account.id, url, update_token, email=self.data['email'])
+                update_token = utils.urlserializer.dumps({'id': account.id, 'email': self.data['email']}, salt='account-update')
+                url = url_for('public', path='apply-account-changes', account_id=account.id, token=update_token,
+                              _external=True)
+                tasks.send_account_update_email.delay(account.id, url, update_token, email=self.data['email'])
 
         if 'password' in self.data:
             if len(self.data['password']) < 8:
