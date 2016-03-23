@@ -1,8 +1,6 @@
-from itsdangerous import URLSafeTimedSerializer
 from dateutil.parser import parse as parse_date
 from validate_email import validate_email
 from config import settings
-from server import app
 import sendgrid
 import requests
 import json
@@ -11,7 +9,6 @@ import re
 
 
 log = logger.getLogger(__name__)
-urlserializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 
 
 def send_email(account, subject, body, cc=None, bcc=None, to=None):

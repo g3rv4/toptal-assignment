@@ -6,6 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.exceptions import HTTPException
 from config import settings
 from dateutil.parser import parse as parse_date
+from itsdangerous import URLSafeTimedSerializer
 import wrapt
 import json
 import types
@@ -18,6 +19,8 @@ import logger
 log = logger.getLogger(__name__)
 app = Flask(__name__)
 api = Api(app)
+
+urlserializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 
 
 class AppError(Exception):
@@ -47,7 +50,7 @@ def verify_token_get_account(roles=None, accountid_free_roles=[], account_should
 
     token = request.headers['Authorization'][7:]
     try:
-        token = utils.urlserializer.loads(token, settings['oauth-token-expiration-seconds'], salt='access-token')
+        token = urlserializer.loads(token, settings['oauth-token-expiration-seconds'], salt='access-token')
     except BadData, e:
         log.error(e)
         raise APIError('Unauthorized', 401)
@@ -215,7 +218,7 @@ class Accounts(DemoResource):
             # make this account a user
             models.AccountRole(account=account, role=models.Role.get(code='user')).save()
 
-            update_token = utils.urlserializer.dumps({'id': account.id, 'active': True}, salt='account-update')
+            update_token = urlserializer.dumps({'id': account.id, 'active': True}, salt='account-update')
             url = url_for('public', path='apply-account-changes', account_id=account.id, token=update_token,
                           _external=True)
 
@@ -226,14 +229,14 @@ class Accounts(DemoResource):
 class Account(DemoResource):
     def update_account(self, account_id):
         try:
-            update_data = utils.urlserializer.loads(self.data['update_token'], salt='account-update', max_age=settings['link-expiration-seconds'])
+            update_data = urlserializer.loads(self.data['update_token'], salt='account-update', max_age=settings['link-expiration-seconds'])
         except SignatureExpired, e:
             encoded_payload = e.payload
             try:
                 # generate it again and send it
-                decoded_payload = utils.urlserializer.load_payload(encoded_payload)
+                decoded_payload = urlserializer.load_payload(encoded_payload)
 
-                update_token = utils.urlserializer.dumps(decoded_payload, salt='account-update')
+                update_token = urlserializer.dumps(decoded_payload, salt='account-update')
                 url = url_for('public', path='apply-account-changes', account_id=account_id, token=update_token,
                               _external=True)
                 tasks.send_account_update_email.delay(account_id, url, update_token, decoded_payload.get('email'))
@@ -329,7 +332,7 @@ class Account(DemoResource):
                 if not check_password_hash(account.password, self.data['current_password']):
                     raise APIError('Invalid current password')
 
-                update_token = utils.urlserializer.dumps({'id': account.id, 'email': self.data['email']}, salt='account-update')
+                update_token = urlserializer.dumps({'id': account.id, 'email': self.data['email']}, salt='account-update')
                 url = url_for('public', path='apply-account-changes', account_id=account.id, token=update_token,
                               _external=True)
                 tasks.send_account_update_email.delay(account.id, url, update_token, email=self.data['email'])
@@ -509,7 +512,7 @@ def login():
         raise AppError('invalid_grant')
 
     if not account.active:
-        update_token = utils.urlserializer.dumps({'id': account.id, 'active': True}, salt='account-update')
+        update_token = urlserializer.dumps({'id': account.id, 'active': True}, salt='account-update')
         url = url_for('public', path='apply-account-changes', account_id=account.id, token=update_token,
                       _external=True)
         tasks.send_activation_email.delay(account.id, url, update_token)
@@ -521,7 +524,7 @@ def login():
     # not generating refresh tokens as it's making it all the way to the user's browser. If an attacker got their
     # hands on a refresh token, they could do anything without a time restriction
     return jsonify({
-        'access_token': utils.urlserializer.dumps({'id': account.id, 'roles': roles}, salt='access-token'),
+        'access_token': urlserializer.dumps({'id': account.id, 'roles': roles}, salt='access-token'),
         'token_type': 'bearer',
         'expires_in': settings['oauth-token-expiration-seconds'],
         'scope': ' '.join(roles)
