@@ -13,15 +13,23 @@ import types
 import models
 import utils
 import tasks
+import logging
 import logger
 
 
 log = logger.getLogger(__name__)
 app = Flask(__name__)
 api = Api(app)
+urlserializer = URLSafeTimedSerializer(settings['secret_key'])
 
-urlserializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
-
+if 'log_path' in settings and settings['log_path']:
+    handler = logging.handlers.RotatingFileHandler(settings['log_path'])
+    handler.setLevel(logging.ERROR)
+    handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(levelname)s: %(message)s '
+        '[in %(pathname)s:%(lineno)d]'
+    ))
+    app.logger.addHandler(handler)
 
 class AppError(Exception):
     def __init__(self, message, status_code=None, *args, **kwargs):
