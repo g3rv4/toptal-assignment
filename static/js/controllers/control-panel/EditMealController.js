@@ -12,7 +12,7 @@
                 };
                 _this.datepickerOptions = {
                     showWeeks: false,
-                    maxDate: Date()
+                    maxDate: new Date()
                 };
 
                 _this.submit = function () {

@@ -8,7 +8,7 @@
 
                 _this.datepickerOptions = {
                     showWeeks: false,
-                    maxDate: Date()
+                    maxDate: new Date()
                 };
                 _this.datepickersOpen = {};
                 _this.query = {'items-per-page': 5, page: 1};
