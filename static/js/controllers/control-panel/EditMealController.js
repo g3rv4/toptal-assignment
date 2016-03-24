@@ -10,6 +10,10 @@
                     date: mealDate,
                     time: mealDate
                 };
+                _this.datepickerOptions = {
+                    showWeeks: false,
+                    maxDate: Date()
+                };
 
                 _this.submit = function () {
                     _this.meal.date = moment(_this.mealForm.date).format('YYYY-MM-DD');
