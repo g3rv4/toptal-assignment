@@ -2,7 +2,7 @@
     define(
         ['lodash', 'moment'],
         function (_, moment) {
-            var SettingsController = function (ModelService, $scope, $timeout) {
+            var SettingsController = function (ModelService, $scope, RolesService) {
                 var _this = this;
                 var User = ModelService.Account;
                 var Meal = ModelService.Meal(0);
@@ -14,6 +14,7 @@
                     maxDate: new Date(),
                     showWeeks: false
                 };
+                _this.userHasRole = RolesService().userHasRole;
 
 
                 var updateUser = function (resetForm) {
@@ -52,7 +53,7 @@
                 };
 
                 _this.updateCaloriesCount = function(){
-                    if(_this.caloriesDay != _this.lastMealsQuery) {
+                    if(_this.userHasRole('user') &&_this.caloriesDay != _this.lastMealsQuery) {
                         _this.lastMealsQuery = _this.caloriesDay;
 
                         Meal.query({
@@ -74,7 +75,7 @@
                 updateUser(true);
             };
 
-            return ['ModelService', '$scope', '$timeout', SettingsController];
+            return ['ModelService', '$scope', 'RolesService', SettingsController];
         }
     );
 }(define));
