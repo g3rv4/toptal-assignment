@@ -26,10 +26,10 @@
                                    id="newUserPassword" name="newUserPassword" minlength="8" required/>
                         </div>
                         <div class="col-lg-3 form-group"
-                             ng-class="ctrl.userFormSent && (!ctrl.formElement.newUserPassword2.$valid || ctrl.newUser.password != ctrl.newUser.password2) ? 'has-error' : ''">
+                             ng-class="ctrl.userFormSent && (!ctrl.formElement.newUserPassword2.$valid) ? 'has-error' : ''">
                             <label class="control-label" for="newUserPassword2">Repeat Password</label>
                             <input type="password" ng-model="ctrl.newUser.password2" class="form-control"
-                                   id="newUserPassword2" name="newUserPassword2" minlength="8" required/>
+                                   id="newUserPassword2" name="newUserPassword2" minlength="8" equals="{{ctrl.newUser.password}}"/>
                         </div>
                     </div>
                     <div class="row">
